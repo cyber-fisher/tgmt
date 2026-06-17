@@ -1,0 +1,637 @@
+\documentclass[twocolumn, a4paper, 10pt]{article}
+\usepackage{ctex}
+
+% --- 中文支持 ---
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+
+% --- 页面设置 ---
+\usepackage[left=1.5cm, right=1.5cm, top=2cm, bottom=2cm]{geometry}
+
+% --- 数学公式支持 ---
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+
+% --- 图片插入支持 ---
+\usepackage{graphicx}
+
+% --- TikZ 绘图 ---
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, calc, shapes.geometric, fit, backgrounds}
+
+% --- 链接与引用 ---
+\usepackage[colorlinks, linkcolor=blue, anchorcolor=blue, citecolor=green]{hyperref}
+
+% --- 标题格式调整 ---
+\usepackage{titlesec}
+
+% --- 算法伪代码 ---
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{float}
+
+\title{\textbf{基于拓扑-几何合并树的节点简化研究}}
+\author{}
+\date{}
+
+\begin{document}
+\raggedbottom
+\sloppy
+\setlength{\emergencystretch}{2em}
+\hbadness=10000
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0pt}
+
+\maketitle
+
+\setcounter{section}{1}
+
+\section{相关研究与研究动机}
+
+\subsection{合并树与增广冗余}
+
+\textbf{合并树与持久性。}科学计算、医学影像和流体模拟中的数据常表示为定义在空间域上的标量场 $f:\Omega\rightarrow\mathbb{R}$。Marching Cubes 等方法可显式重建单一阈值的等值面，但逐阈值抽取难以揭示结构随阈值变化的全局层次。\cite{lorensen_cline_1987} 拓扑数据分析为此提供了更紧凑的表示：轮廓树与合并树通过刻画（子）水平集连通分量的演化，把连续阈值空间压缩为树结构。\cite{van_kreveld_1997,carr_contour_2003} 对子水平集 $F_\alpha=\{x\in\Omega\mid f(x)\leq\alpha\}$，合并树记录其连通分量随 $\alpha$ 增大而出生、合并、归并的过程，极值点、鞍点和分支节点对应关键拓扑事件，树边表示相邻事件之间的演化区间；持久性则用于衡量特征显著性，短寿命特征常被视为噪声。\cite{edelsbrunner_persistence_2002} Topology ToolKit（TTK）将这些结构封装为可与 ParaView、VTK 衔接的工程模块，使输入是带有节点标量、临界类型、坐标和弧分割区域的拓扑数据结构。\cite{tierny_ttk_2018}
+
+\textbf{增广合并树的冗余问题。}传统合并树只保留临界节点，不足以支撑交互探索与等值面追踪——两个相邻拓扑事件之间虽无连通性变化，等值面仍可能明显改变形状、体积或穿过新的网格区域。为保留这些中间状态，增广合并树在临界节点之间插入大量普通节点，并将树边关联到原始数据的分割区域。\cite{gueunet_amt_2017,koepp_temporal_2023,li_distributed_2024} 但增广也带来冗余：普通节点过密使树难以阅读，相邻普通节点的局部等值结构往往高度相似，全部保留会产生近似重复的等值面并增加存储与交互成本。由此引出本文的核心问题：在保留关键拓扑结构的前提下，如何筛选出真正有代表性的普通节点。围绕这一问题，已有工作可沿两个方向梳理——以删除拓扑特征为目标的拓扑驱动简化，以及以几何量衡量结构差异的几何驱动度量；本文方法正是为弥合二者的不足而提出。
+
+\subsection{拓扑驱动的简化及其局限}
+
+第一个方向以删除不重要的拓扑特征为目标。基于持久性的简化把短寿命的临界点配对视为噪声消去，衍生出持久性阈值、分支重要性和分支分解等多尺度方法，其操作对象是拓扑事件本身。\cite{edelsbrunner_persistence_2002,carr_geometric_2004} 这一方向中与本文最相关的是 Carr 等的柔性等值面（flexible isosurface）框架\cite{carr_flexible_2010}：它以轮廓树作为可交互索引\cite{carr_contour_2003}，借助路径种子（path seed）从同一阈值的多个分量中精确提取单个等值连通分量，延续了等值面遍历中种子集合的思想\cite{van_kreveld_1997}。其简化由两类操作完成——叶子剪枝（leaf pruning）删除小拓扑特征并把对应区域压平到鞍点值，实质改变标量场拓扑；顶点归约（vertex reduction）则仅依据连通性折叠不再改变连通性的中间节点。
+
+然而这两类操作都不契合本文目标。叶子剪枝会改删拓扑，而本文要求严格保留根、叶、鞍点和分支节点；顶点归约虽不改标量场，但其判据纯粹是连通性，一旦套用到增广合并树，整条拓扑链上的普通节点都会被无差别折叠成一条超弧，链内记录的等值面几何演化随之全部丢失。换言之，拓扑驱动的简化要么改删拓扑、要么仅凭连通性折叠链内节点，缺少一个在保留拓扑结构的前提下、按几何代表性筛选链内普通节点的判据。
+
+\subsection{几何驱动的度量及其局限}
+
+第二个方向用几何量而非纯拓扑事件来衡量结构的重要性或差异。柔性等值面框架本身已引入局部几何度量（local geometric measure），以等值面面积、区域体积及兼顾空间规模与函数值偏离的超体积（hypervolume）作为剪枝代价，并指出超体积比纯持久性或纯体积更适合探索。\cite{carr_geometric_2004,carr_flexible_2010} 但这类度量是赋予单个特征的标量重要性，用于剪枝排序，并不直接回答“链内相邻两个普通节点是否足够不同”这一成对（pairwise）比较问题。
+
+更直接的成对思路是度量等值面相似性。Bruckner 和 Möller 的等值面相似性图（ISM）用归一化互信息比较等值面结构、选出代表性等值面，说明拓扑不变时几何仍可能改变。\cite{bruckner_ism_2010} 但若直接把一个标量层级上的局部或全局等值结构编码为单一距离场，多个连通分支的变化会被混合到同一个描述符中；当本文关注的是某条增广链上的普通节点筛选时，这种未按分支组织的比较可能削弱对旁支变化或局部连通重组的响应。此外，若在同一阈值下抽取全局等值面，还可能引入属于其他分支的无关结构。这说明几何驱动的成对度量需要被限制在合适的拓扑范围内，并在多分支同时活跃时保留分支身份。本文据此把 ISM 作为一个按分支构造距离场的 \textsc{BranchDiff} 实例嵌入统一框架（\ref{sec:ism} 节），以缓解整体描述符容易混合分支信息的问题。
+
+\subsection{合并树比较与图表示学习}
+
+与逐数据集内部简化相关的另一脉络是合并树之间的比较：结构平均、编辑距离、Wasserstein 距离和 interleaving distance 等被用于比较不同标量场、时间步或 ensemble 成员。\cite{yan_average_2020,pont_wasserstein_2022,wetzels_branch_2022} 其中局部比较思想尤其相关——Sridharamurthy 和 Natarajan 的局部 merge tree edit distance 强调细粒度的局部比较，Yan 等的 geometry-aware 比较把几何信息引入树间对应。\cite{sridharamurthy_local_2023,yan_geometry_2023} 它们提示普通节点筛选应结合局部拓扑位置与局部几何，但目标是度量两棵树之间的差异，而本文是在同一棵树内部沿拓扑链筛选冗余节点，无需求树间对应。
+
+\textbf{图表示学习与节点筛选。}除显式几何度量外，局部结构也可由数据学习其表示：GCN、GraphSAGE 能把邻域结构与节点特征编码为低维向量，GIN 刻画了消息传递网络区分图结构的能力。\cite{kipf_gcn_2017,hamilton_graphsage_2017,xu_gin_2019} 这为本文用图级 embedding 比较局部结构提供了工具——具体而言，把每个候选节点诱导的"活性子图"（原始网格上被等值面截穿的边及其端点）经 GCN 编码后比较，可作为统一多分支框架下的第三种 \textsc{BranchDiff} 实例（详见 \ref{sec:gnn} 节）。
+
+\subsection{研究动机}
+
+上述梳理显示，拓扑驱动的简化与几何驱动的度量各有所长亦各有盲区：前者擅长去噪，但要么改删拓扑、要么仅凭连通性折叠链内普通节点；后者能刻画形状与规模，但若脱离合并树分支来整体比较，可能混合多个连通分支的变化。本文的核心立场是融合二者：在严格保留拓扑结构的前提下，提出一个拓扑保持的多分支感知增广合并树节点简化框架，并在该框架内用分支级几何/结构差异筛选链内普通节点。
+
+这一框架具体落实为三项设计。其一，简化范围受拓扑约束：结构节点全部保留，候选普通节点沿所属拓扑链顺序筛选，简化后通过合并原始弧重建合法树。其二，基础差异度量按分支实例化：局部体积 IoU、ISM 距离场和局部活性子图 GNN 分别从规模、几何形态和离散连通结构三个角度定义 \textsc{BranchDiff}，但都输出统一的单分支差异 $d_\ell$。其三，多分支场景下按重要性加权：一个标量层级可能同时穿过主分支与旁支，本文保留这些分支身份，并按标量跨度型拓扑显著性与几何规模把多个 $d_\ell$ 汇总为整体差异 $D$。
+
+据此，本文将增广合并树普通节点简化表述为拓扑约束下的局部代表点选择问题。给定拓扑链 $v_0,v_1,\ldots,v_k$（$v_0$、$v_k$ 为必须保留的结构节点，中间为候选普通节点），算法从 $v_0$ 出发维护最近保留节点 $v_r$，依次比较候选 $v_i$ 与 $v_r$ 的多分支加权差异 $D(v_r,v_i)$，超过阈值则保留并更新参考节点，最终保留 $v_k$。因此，本文的主线不是提出彼此独立的多个简化器，而是给出一个固定的拓扑保持框架；IoU、ISM 与 GNN 只替换其中的分支差异子过程。
+
+\subsection{论文结构}
+
+本文余下内容将围绕这一框架展开：方法部分先介绍拓扑链分解、链上筛选和多分支加权汇总，再给出 IoU、ISM 与 GNN 三种 \textsc{BranchDiff} 实例。后续实验部分可据此比较不同实例和参数设置对节点保留数量、局部结构表达与分支变化响应的影响。
+
+\section{方法}
+
+本节先给出整体简化框架，说明本文如何在拓扑约束下把普通节点筛选组织成一个连通分支感知的链上贪心过程；随后给出关键细节，即如何定义单个分支上的差异 $d_\ell$，以及如何按拓扑显著性和几何规模把多个分支的差异加权汇总为整体差异 $D$。本文方法可概括为：以拓扑保持的多分支加权为外层框架，以局部体积 IoU、ISM 距离场和局部活性子图 GNN 作为三个可替换的 \textsc{BranchDiff} 实例。
+
+\subsection{问题定义}
+
+给定定义在规则网格 $\Omega$ 上的标量场 $f:\Omega\rightarrow\mathbb{R}$ 及其增广合并树 $T=(V,E,f)$。节点集合 $V$ 可按拓扑角色分为两类：结构节点集合 $V_s$，包括根节点、叶节点（局部极值）和分支节点（鞍点），它们刻画连通性发生改变的关键拓扑事件；普通节点集合 $V_o=V\setminus V_s$，即度数为 $2$、不改变连通性的增广节点。增广带来的冗余主要集中在 $V_o$：相邻普通节点对应的局部等值结构往往高度相似，却被完整保留。
+
+本文的目标是在不改变标量场拓扑的前提下精简 $V_o$。给定容差 $\varepsilon>0$ 以及定义在 $V\times V$ 上的局部差异度量 $D(\cdot,\cdot)$（具体形式由后文给出），问题表述为寻找一个保留集合 $K\subseteq V$ 满足约束
+\begin{equation}
+V_s\subseteq K\subseteq V,
+\label{eq:keep-constraint}
+\end{equation}
+并且在每条拓扑链 $C=(v_0,\ldots,v_k)$ 内，把 $K\cap C$ 视为按标量排序的序列 $v_0=u_0,u_1,\ldots,u_m=v_k$ 时，希望相邻保留节点之间的差异受阈值 $\varepsilon$ 控制：
+\begin{equation}
+D(u_{j-1},u_j)<\varepsilon,\quad j=1,\ldots,m,
+\label{eq:eps-cover}
+\end{equation}
+该约束把链内节点筛选转化为代表点选择问题：保留节点不必覆盖所有细节，但相邻代表节点之间的局部差异被限制在预设容差内。本文采用线性、可控且易实现的沿链贪心策略作为构造性解：总以最近一次保留节点 $v_r$ 为参考，遇到首个使 $D(v_r,v_i)\geq\varepsilon$ 的候选节点即保留并更新 $v_r$。这一策略不依赖全局优化，适合在增广合并树的多条拓扑链上独立执行。
+
+由 $K$ 重建简化合并树 $T'$ 的规则如下：对每条拓扑链按 $K\cap C$ 的相邻保留对 $(u_{j-1},u_j)$ 生成一条新弧，其标量跨度取 $|f(u_j)-f(u_{j-1})|$，区域规模 $\text{RegionSize}$ 取该对在原树中所跨越的全部原始弧的累加；端点连通关系由原拓扑链端点继承，从而 $T'$ 与 $T$ 保持相同的根、叶与分支结构，是一棵合法合并树。这一约束有两层含义：结构节点必须全部保留（拓扑结构决定哪些节点不能删），普通节点只在其所属拓扑链和局部连通分支内被比较和取舍（拓扑链决定哪些节点可比较）。问题的核心因此归结为：如何定义两个普通节点之间在局部连通分支上的差异 $D$，以及如何沿链选出一组能代表链内主要变化的普通节点。
+
+\subsection{整体框架}
+
+\paragraph{术语约定。}本文在算法层面区分两个相关概念。"拓扑链 (chain)" 指以两个结构节点为端点、内部全为度数 $2$ 普通节点的极大单调路径，是链上贪心扫描的基本单位。"分支 (branch)" 指在某一标量层级附近参与局部差异计算的链段或连通分量，用 $b_\ell$ 表示；在本文实现中，它由同一链段关联的分割标签和标量范围确定。为简化记号，本文常用分支 $b_\ell\subseteq V$ 表示一条满足以下条件的节点序列：(i) 由两个端点结构节点和它们之间的一段普通节点构成；(ii) 按标量值排序后单调；(iii) 各链段对整棵增广合并树形成无重叠分解。该工作定义服务于本文的节点筛选算法，不声称与所有文献中的 branch decomposition 完全等同。分支的标量范围记为 $[f_{\min}(b_\ell),f_{\max}(b_\ell)]$，定义为分支内全部节点标量的最小/最大值；其标量跨度型拓扑显著性记为 $\pi_\ell=f_{\max}(b_\ell)-f_{\min}(b_\ell)$，作为持久性思想的工程近似。在算法叙述中，强调扫描顺序时使用拓扑链 $C=(v_0,\ldots,v_k)$，强调局部差异和权重时使用分支 $b_\ell$。
+
+\begin{figure*}[t]
+\centering
+\begin{tikzpicture}[
+  font=\small,
+  >={Stealth[length=2.2mm]},
+  stage/.style={draw, rounded corners=2pt, align=center, minimum height=15mm,
+                minimum width=22mm, fill=blue!5, line width=0.5pt},
+  flow/.style={->, line width=0.7pt, blue!55!black},
+  lbl/.style={font=\scriptsize\bfseries, text=black!75},
+  minic/.style={font=\scriptsize, text=black!60, align=center},
+]
+
+% ---- node coordinates ----
+\node[stage] (input) {增广\\合并树\\$T=(V,E,f)$};
+\node[stage, right=10mm of input] (decomp) {结构节点识别\\拓扑链分解};
+\node[stage, right=10mm of decomp] (main) {逐链处理\\$C=(v_0{:}v_k)$};
+\node[stage, right=22mm of main] (greedy) {链上贪心\\$D\!\ge\!\varepsilon$ 保留};
+\node[stage, right=10mm of greedy] (rebuild) {重建\\简化树 $T'$};
+
+% ---- main flow arrows ----
+\draw[flow] (input) -- (decomp);
+\draw[flow] (decomp) -- (main);
+\draw[flow] (main) -- (greedy);
+\draw[flow] (greedy) -- (rebuild);
+
+% ---- stage labels above ----
+\node[lbl, above=1mm of input] {输入};
+\node[lbl, above=1mm of decomp] {分解};
+\node[lbl, above=1mm of main] {遍历};
+\node[lbl, above=1mm of greedy] {筛选};
+\node[lbl, above=1mm of rebuild] {输出};
+
+% ---- mini illustrations under each stage ----
+\node[minic, below=1.5mm of input] {临界节点+\\稠密普通节点};
+\node[minic, below=1.5mm of decomp] {链=结构节点\\为端点};
+\node[minic, below=1.5mm of main] {所有链统一\\多分支加权};
+\node[minic, below=1.5mm of rebuild] {合并跨越弧\\保持合法树};
+
+% ---- difference metric plug-in box (feeds greedy) ----
+\node[draw, dashed, rounded corners=2pt, fill=orange!6, line width=0.5pt,
+      align=center, minimum width=42mm, below=12mm of greedy] (diff)
+      {\scriptsize\textbf{分支差异 $\textsc{BranchDiff}$（可替换）}};
+\node[draw, rounded corners=1.5pt, fill=orange!12, font=\scriptsize, align=center,
+      minimum width=13mm, minimum height=8mm, below=7mm of diff.south, xshift=-15mm] (iou)
+      {IoU\\\scriptsize$1{-}\mathrm{IoU}$};
+\node[draw, rounded corners=1.5pt, fill=orange!12, font=\scriptsize, align=center,
+      minimum width=13mm, minimum height=8mm, below=7mm of diff.south] (ism)
+      {ISM\\\scriptsize$1{-}\mathrm{NMI}$};
+\node[draw, rounded corners=1.5pt, fill=orange!12, font=\scriptsize, align=center,
+      minimum width=13mm, minimum height=8mm, below=7mm of diff.south, xshift=15mm] (gnn)
+      {GNN\\\scriptsize$1{-}\cos$};
+\draw[->, line width=0.6pt, orange!70!black] (iou) -- (diff);
+\draw[->, line width=0.6pt, orange!70!black] (ism) -- (diff);
+\draw[->, line width=0.6pt, orange!70!black] (gnn) -- (diff);
+% ---- multi-branch weighting node between BranchDiff and greedy ----
+\node[draw, rounded corners=2pt, fill=teal!8, line width=0.5pt, align=center,
+      font=\scriptsize, minimum width=34mm, minimum height=7mm]
+      (wsum) at ($(diff.north)!0.5!(greedy.south)$)
+      {多分支加权汇总\\$D=\sum_\ell w_\ell\, d_\ell$};
+\draw[->, line width=0.7pt, orange!70!black] (diff) -- (wsum)
+      node[midway, right, font=\scriptsize, text=black!60] {$d_\ell$};
+\draw[->, line width=0.7pt, teal!55!black] (wsum) -- (greedy)
+      node[midway, right, font=\scriptsize, text=black!60] {$D$};
+
+% ---- multi-branch weighting note into greedy ----
+\node[minic, below=1.5mm of greedy.south, yshift=-1mm] {};
+
+\end{tikzpicture}
+\caption{本文方法总览：输入 $\to$ 分解 $\to$ 遍历 $\to$ 筛选 $\to$ 输出。BranchDiff 子过程在 IoU/ISM/GNN 三种实例间替换并输出 $d_\ell$，经多分支加权汇总为 $D$，再交链上贪心判定。}
+\label{fig:overview}
+\end{figure*}
+
+\paragraph{树重建与结构节点识别。}算法首先从 txt 树结构（每行 \texttt{nodeId\ parentId\ scalar}）重建父子关系：以 \texttt{parentId} 指向自身或为负者为根，其余节点挂接到对应父节点，得到一棵有根树。每个节点的度数由其子节点数与父边共同决定，据此判定拓扑角色——根节点、叶节点（无子节点）和分支节点（子节点数大于一）归入结构节点 $V_s$，其余度数为 $2$ 的节点归入候选普通节点 $V_o$。树类型（Join Tree 或 Split Tree）决定标量的单调方向，进而决定后续局部体积或活性边提取时的阈值方向。
+
+\paragraph{拓扑链分解。}从每个结构节点出发，沿度数为 $2$ 的普通节点连续游走，直到到达下一个结构节点，即得到一条以两个结构节点为端点的拓扑链；链内节点按标量值排序定向。这样整棵树被无重叠地分解为若干条拓扑链
+\begin{equation}
+C=(v_0,v_1,\ldots,v_k),
+\end{equation}
+其中 $v_0$、$v_k$ 为必须保留的结构节点，中间节点为候选普通节点。每条链内部的普通节点都是同一段拓扑不变区间上的候选简化对象。本文不区分主链与旁支，对所有拓扑链一视同仁，均采用下文的连通分支感知多分支加权策略逐链筛选，以保证全树处理的一致性。
+
+\paragraph{连通分支感知的差异。}每条链上每个候选节点是否保留，不取决于其在全局等值面中的表现，而取决于它相对于最近保留参考节点 $v_r$ 的局部差异。与仅在当前链内比较不同，本文显式考虑该标量层级附近的多个连通分支：在合并树中，一个等值层级可能同时穿过多条分支，若只比较当前链自身或把所有分支混为一谈，都会丢失旁支上的真实变化。记每条分支 $b$ 的标量范围为 $[\,f_{\min}(b),f_{\max}(b)\,]$，对候选节点 $v_i$（阈值 $t_i=f(v_i)$），其活跃分支集合定义为该层级穿过的所有分支：
+\begin{equation}
+\mathcal{B}(t_i)=\{\,b\mid f_{\min}(b)\leq t_i\leq f_{\max}(b)\,\}.
+\end{equation}
+在每个活跃分支 $b_\ell\in\mathcal{B}(t_i)$ 上分别计算参考节点与候选节点的局部差异 $d_\ell(v_r,v_i)$，再按权重汇总为整体差异：
+\begin{equation}
+D(v_r,v_i)=\sum_{\ell}w_\ell\, d_\ell(v_r,v_i),
+\qquad \sum_{\ell}w_\ell=1.
+\label{eq:aggregate}
+\end{equation}
+其中权重 $w_\ell$ 由分支的标量跨度型拓扑显著性 $\pi_\ell$ 和几何规模 $s_\ell$ 通过混合系数 $\alpha$ 共同决定，具体形式见 \ref{sec:weight} 节式~\eqref{eq:wtopo}、\eqref{eq:wgeo}、\eqref{eq:wmix}（为保持本节叙述紧凑，权重设计放在三种 \textsc{BranchDiff} 实例之后单独讨论）。这一加权设计避免把所有分支简单平均、也避免大分支完全压制小而拓扑重要的分支。
+
+\paragraph{链上贪心与重建。}普通节点筛选采用链上贪心策略，对每条拓扑链 $C=(v_0,\ldots,v_k)$ 独立执行。算法保留链起点 $v_0$ 并令 $v_r\leftarrow v_0$，随后依次扫描中间候选节点 $v_i$，计算整体差异 $D(v_r,v_i)$；若
+\begin{equation}
+D(v_r,v_i)\geq \varepsilon,
+\end{equation}
+则保留 $v_i$ 并更新 $v_r\leftarrow v_i$，否则跳过；扫描结束后始终保留终点 $v_k$。这一策略的含义是：参考节点始终是上一个被认为“足够不同”的节点，因此被跳过的连续普通节点都相对于同一参考节点保持在阈值以内，使链内代表点的间隔由 $\varepsilon$ 直接控制，而不是逐点累积漂移。对全部拓扑链完成保点判定后，再根据保留节点集合合并被删除节点跨越的弧——新弧的标量跨度取两端保留节点之差，区域规模取被合并各弧之和——从而重建出仍然合法的简化合并树。
+
+整体流程如算法~\ref{alg:framework} 和图~\ref{fig:overview} 所示。框架的不变部分（链分解、活跃分支识别、多分支加权汇总、链上贪心、重建）对所有度量保持一致，所有拓扑链统一采用连通分支感知的多分支加权——其中权重 $w_\ell$ 由分支的拓扑显著性与几何规模共同决定，是本文 framework 级的核心贡献，与三种 BranchDiff 实例正交。唯一与具体度量相关的部分，是计算单个分支差异的子过程 $\textsc{BranchDiff}(v_r,v_i,b_\ell)$，它输出单分支差异 $d_\ell$ 后由式~\eqref{eq:aggregate} 汇总为整体差异 $D=\sum_\ell w_\ell\, d_\ell$。本文为这一子过程给出三种实例化：局部体积 IoU（\ref{sec:iou} 节，算法~\ref{alg:iou}）、ISM 距离场（\ref{sec:ism} 节，算法~\ref{alg:ism}）和局部活性子图的 GNN 向量化距离（\ref{sec:gnn} 节，算法~\ref{alg:gnn}）。三者依次从“规模”“几何形态”到“连通结构”刻画分支差异，互为对照；其中权重 $w^{\mathrm{geo}}_\ell$ 所需的分支局部规模也由各度量给出（体积集合大小或活性子图规模）。
+
+图~\ref{fig:retention} 以一个三分支同时活跃的例子，示意多分支加权差异如何影响保留判定：小分支 $b_2$ 几何规模虽小却正经历明显截交变化（示意值 $d_2=0.75$），而大分支 $b_1$ 几乎不变；若按纯几何规模加权，$b_2$ 的影响容易被大分支稀释，汇总差异 $D=0.22<\varepsilon$，$v_i$ 被删除；本文以标量跨度型拓扑显著性与几何规模共同加权（式~\eqref{eq:wmix}），令拓扑显著性较高的小分支获得更多权重，$D=0.38\geq\varepsilon$ 从而保留 $v_i$。
+
+\begin{algorithm}[H]
+\caption{连通分支感知的多分支加权简化（总体框架）}
+\label{alg:framework}
+\begin{algorithmic}[1]
+\Require 合并树 $T=(V,E,f)$，阈值 $\varepsilon$，混合系数 $\alpha$
+\Ensure 保留节点集合 $K$，简化树 $T'$
+\State 重建父子关系，识别结构节点，分解拓扑链 $\mathcal{C}$
+\State $K \gets V_s$ \Comment{$V_s$：结构节点，全部保留}
+\ForAll{拓扑链 $C=(v_0,\ldots,v_k) \in \mathcal{C}$}
+  \State $v_r \gets v_0$
+  \For{$i \gets 1$ \textbf{to} $k-1$}
+    \State $t_i \gets f(v_i)$
+    \State $\mathcal{B}(t_i) \gets$ 穿过 $t_i$ 的活跃分支集合
+    \ForAll{$b_\ell \in \mathcal{B}(t_i)$}
+      \State $d_\ell \gets \textsc{BranchDiff}(v_r,v_i,b_\ell)$ \Comment{算法~\ref{alg:iou}/\ref{alg:ism}/\ref{alg:gnn}}
+      \State 由式~\eqref{eq:wtopo}、\eqref{eq:wgeo} 算 $w^{\mathrm{topo}}_\ell,w^{\mathrm{geo}}_\ell$
+    \EndFor
+    \State 由式~\eqref{eq:wmix} 归一化得 $\{w_\ell\}$
+    \State $D \gets \sum_\ell w_\ell\, d_\ell$
+    \If{$D \ge \varepsilon$}
+      \State $K \gets K \cup \{v_i\}$；\quad $v_r \gets v_i$
+    \EndIf
+  \EndFor
+\EndFor
+\State 合并被删节点跨越的弧，重建 $T'$
+\State \Return $K,\ T'$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{figure*}[t]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  font=\footnotesize,
+  >={Stealth[length=2mm]},
+  sn/.style={circle, draw, line width=1pt, minimum size=6.5mm, inner sep=0pt},
+  l1/.style={sn, fill=orange!80},
+  l2/.style={sn, fill=green!60!black!70, text=white},
+  l3/.style={sn, fill=purple!65, text=white},
+  sad/.style={sn, fill=blue!55!cyan!80, text=white},
+  root/.style={sn, fill=red!70!black!80, text=white},
+  on/.style={circle, draw, line width=0.6pt, fill=gray!18, minimum size=4.2mm, inner sep=0pt, font=\scriptsize},
+  cand/.style={circle, draw=red!75!black, line width=1.2pt, fill=yellow!70, minimum size=5mm, inner sep=0pt, font=\scriptsize},
+  rem/.style={circle, draw, line width=0.6pt, densely dashed, fill=white, minimum size=4.2mm, inner sep=0pt, font=\scriptsize, text=gray!55},
+  ed/.style={line width=0.8pt, gray!55},
+  edk/.style={line width=1.1pt, black!75},
+  lev/.style={line width=0.7pt, red!70!black, densely dashed},
+  plab/.style={font=\scriptsize, text=black!70},
+]
+
+% =========================================================
+% three-leaf tree coordinates (no shift; each panel scope shifts once)
+%   b1: L1 - p1 - S1 ; b2: L2 - q1 - S1 ; b3: L3 - s1 - s2 - S2
+%   S1 - r1 - S2 ; S2 - u1 - T
+%   level line t* at y=2.8 crosses b1,b2,b3 simultaneously
+% =========================================================
+\def\deftree{
+  \coordinate (L1) at (0,3.6);   \coordinate (L2) at (1.5,3.6);  \coordinate (L3) at (3.0,3.6);
+  \coordinate (p1) at (0.375,2.8); \coordinate (q1) at (1.125,2.8);
+  \coordinate (S1) at (0.75,2.0);
+  \coordinate (s1) at (2.585,2.8); \coordinate (s2) at (2.05,1.65);
+  \coordinate (r1) at (1.175,1.45);
+  \coordinate (S2) at (1.6,0.9);
+  \coordinate (u1) at (1.6,0.2);
+  \coordinate (T)  at (1.6,-0.6);
+}
+
+% ---------- Panel (a): augmented merge tree with level t* crossing 3 branches ----------
+\begin{scope}[shift={(0,0)}]
+  \deftree
+  \draw[ed] (L1)--(p1)--(S1); \draw[ed] (L2)--(q1)--(S1);
+  \draw[ed] (L3)--(s1)--(s2)--(S2); \draw[ed] (S1)--(r1)--(S2); \draw[ed] (S2)--(u1)--(T);
+  \draw[lev] (-0.45,2.8)--(3.35,2.8) node[right,font=\scriptsize,text=red!70!black]{$t^\ast$};
+  \node[on] at (q1){}; \node[on] at (s1){}; \node[on] at (s2){};
+  \node[on] at (r1){}; \node[on] at (u1){};
+  \node[l1] at (L1){}; \node[l2] at (L2){}; \node[l3] at (L3){};
+  \node[sad] at (S1){}; \node[sad] at (S2){}; \node[root] at (T){};
+  \node[cand] at (p1){}; \node[plab,text=red!70!black] at (-0.55,2.45){$v_i$};
+  \node[plab,orange!75!black] at (-0.3,3.4){$b_1$};
+  \node[plab,green!45!black]  at (1.5,4.05){$b_2$};
+  \node[plab,purple!70]       at (3.3,3.4){$b_3$};
+  \node[plab] at (1.3,-1.35) {(a) 三分支活跃于 $t^\ast$};
+\end{scope}
+
+% ---------- Panel (b): chain decomposition ----------
+\begin{scope}[shift={(5.0,0)}]
+  \deftree
+  \draw[line width=1.1pt, orange!85!black] (L1)--(p1)--(S1);
+  \draw[line width=1.1pt, green!50!black]  (L2)--(q1)--(S1);
+  \draw[line width=1.1pt, purple!70]        (L3)--(s1)--(s2)--(S2);
+  \draw[line width=1.1pt, blue!55!black]    (S1)--(r1)--(S2);
+  \draw[line width=1.1pt, red!55!black]     (S2)--(u1)--(T);
+  \node[on] at (p1){}; \node[on] at (q1){}; \node[on] at (s1){}; \node[on] at (s2){};
+  \node[on] at (r1){}; \node[on] at (u1){};
+  \node[l1] at (L1){}; \node[l2] at (L2){}; \node[l3] at (L3){};
+  \node[sad] at (S1){}; \node[sad] at (S2){}; \node[root] at (T){};
+  \node[plab,orange!75!black] at (-0.35,3.0){$C_1$};
+  \node[plab,green!45!black]  at (1.85,3.0){$C_2$};
+  \node[plab,purple!70]       at (3.3,2.95){$C_3$};
+  \node[plab,blue!55!black]   at (0.7,1.35){$C_4$};
+  \node[plab,red!55!black]    at (2.05,0.15){$C_5$};
+  \node[plab] at (1.3,-1.35) {(b) 拓扑链分解};
+\end{scope}
+
+% ---------- Panel (c): per-branch local diff at v_i (bars) ----------
+\begin{scope}[shift={(10.0,-0.6)}]
+  \def\sc{2.3}
+  \draw[line width=0.7pt,black!55] (-0.3,0)--(2.65,0);
+  \draw[line width=0.7pt,black!55] (-0.3,0)--(-0.3,2.2);
+  \node[plab,rotate=90] at (-0.72,1.1){局部差异 $d_\ell$};
+  % bars: d1=0.20, d2=0.75, d3=0.25
+  \fill[orange!80]      (0.05,0) rectangle (0.65,{0.20*\sc});
+  \fill[green!60!black!70] (0.95,0) rectangle (1.55,{0.75*\sc});
+  \fill[purple!65]      (1.85,0) rectangle (2.45,{0.25*\sc});
+  \node[font=\scriptsize] at (0.35,{0.20*\sc+0.18}){$0.20$};
+  \node[font=\scriptsize] at (1.25,{0.75*\sc+0.18}){$0.75$};
+  \node[font=\scriptsize] at (2.15,{0.25*\sc+0.18}){$0.25$};
+  \node[plab,orange!75!black] at (0.35,-0.28){$b_1$大};
+  \node[plab,green!45!black]  at (1.25,-0.28){$b_2$小};
+  \node[plab,purple!70]       at (2.15,-0.28){$b_3$中};
+  \node[plab] at (1.1,-1.0) {(c) 各分支差异（$b_2$ 剧变）};
+\end{scope}
+
+% ---------- Panel (d): aggregation comparison & verdict ----------
+\begin{scope}[shift={(13.7,-0.6)}]
+  \def\sc{2.3}
+  \draw[line width=0.7pt,black!55] (-0.2,0)--(2.5,0);
+  \draw[line width=0.7pt,black!55] (-0.2,0)--(-0.2,2.2);
+  % epsilon threshold
+  \draw[line width=0.8pt,red!70!black,densely dashed] (-0.2,{0.30*\sc})--(2.5,{0.30*\sc})
+        node[right,font=\scriptsize,text=red!70!black]{$\varepsilon$};
+  % D_size = 0.22 (below) ; D_ours = 0.38 (above)
+  \fill[gray!45]   (0.15,0) rectangle (0.95,{0.22*\sc});
+  \fill[teal!70!black] (1.45,0) rectangle (2.25,{0.38*\sc});
+  \node[font=\scriptsize] at (0.55,{0.22*\sc+0.18}){$0.22$};
+  \node[font=\scriptsize] at (1.85,{0.38*\sc+0.18}){$0.38$};
+  \node[red!70!black,font=\scriptsize]   at (0.55,-0.3){$\times$ 误删};
+  \node[green!45!black,font=\scriptsize] at (1.85,-0.3){$\checkmark$ 保留};
+  \node[plab,align=center] at (0.55,-0.78){纯规模\\加权};
+  \node[plab,align=center,teal!50!black] at (1.85,-0.78){拓扑+几何\\加权（本文）};
+  \node[plab] at (1.1,-1.5) {(d) 加权汇总 $D$ 与判定};
+\end{scope}
+
+\end{tikzpicture}%
+}
+\caption{多分支加权差异的效果示意（数值为示意值）。(a) 三条叶分支 $b_1,b_2,b_3$ 同时被标量层级 $t^\ast$ 穿过，候选节点 $v_i$ 位于 $b_1$；(b) 拓扑链分解 $C_1$–$C_5$；(c) 三分支局部差异 $d_\ell$；(d) 纯几何规模加权 vs 本文拓扑+几何加权的汇总 $D$ 与判定。}
+\label{fig:retention}
+\end{figure*}
+
+\subsection{局部体积 IoU 差异}
+\label{sec:iou}
+
+第一种实例化只关注分支局部的体积规模变化，作为最轻量的差异度量。它不重建等值面，也不统计整场真实体素，而是在分支 $b_\ell$ 内用节点构造离散的子水平集体积代理。
+
+\paragraph{比较方式。}给定节点 $v$ 及其阈值 $t=f(v)$，分支 $b_\ell$ 在该阈值下的局部体积集合定义为分支内标量处于阈值同侧的节点集合，方向由树类型决定：
+\begin{equation}
+\mathcal{V}_\ell(v)=
+\begin{cases}
+\{u\in b_\ell\mid f(u)\leq t\}, & \mathrm{JT},\\
+\{u\in b_\ell\mid f(u)\geq t\}, & \mathrm{ST}.
+\end{cases}
+\label{eq:volset}
+\end{equation}
+该集合是分支节点级别的离散体积代理：以"标量阈值同侧的分支节点数"近似该分支在阈值 $t$ 下被覆盖的体量。本文实现采用此代理是因为它无需访问体素体数据、只依赖树本身，故可在 \texttt{txt} 输入（含合并树而无原始网格）上直接计算；若 $\mathcal{V}_\ell$ 替换为分支关联分割区域内 $f\leq t$ 的真实体素集合，则得到等价的体素体积 backend，两者公式 \eqref{eq:iou} 形式相同，仅集合粒度不同。参考节点 $v_r$ 与候选节点 $v_i$ 在该分支上的差异由两个体积集合的交并比（Intersection-over-Union）给出：
+\begin{equation}
+d_\ell(v_r,v_i)=1-\frac{|\mathcal{V}_\ell(v_r)\cap \mathcal{V}_\ell(v_i)|}{|\mathcal{V}_\ell(v_r)\cup \mathcal{V}_\ell(v_i)|}.
+\label{eq:iou}
+\end{equation}
+两个体积高度重合时 IoU 接近 $1$、$d_\ell$ 接近 $0$，表示候选节点未带来明显规模变化；集合差异越大 $d_\ell$ 越大。该度量参数直观、计算开销低，适合作为链内快速初筛，但只能感知规模、无法区分体积相近而形态或连通性不同的结构。对应的几何规模权重取体积集合大小 $|\mathcal{V}_\ell|$。算法~\ref{alg:iou} 给出其计算过程。
+
+\begin{algorithm}[H]
+\caption{\textsc{BranchDiff} 的 IoU 实例}
+\label{alg:iou}
+\begin{algorithmic}[1]
+\Require 参考节点 $v_r$，候选节点 $v_i$，分支 $b_\ell$
+\Ensure 分支差异 $d_\ell$
+\Function{BranchDiff}{$v_r,v_i,b_\ell$}
+  \ForAll{$v \in \{v_r,\,v_i\}$}
+    \State 按式~\eqref{eq:volset} 取分支内阈值同侧节点集 $\mathcal{V}_\ell(v)$
+  \EndFor
+  \State \Return $1-|\mathcal{V}_\ell(v_r)\cap\mathcal{V}_\ell(v_i)|\,/\,|\mathcal{V}_\ell(v_r)\cup\mathcal{V}_\ell(v_i)|$
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{ISM 距离场差异}
+\label{sec:ism}
+
+第二种实例化关注分支局部等值面的几何形态，用信息论度量比较两个节点诱导的距离场，作为几何形态层面的 \textsc{BranchDiff} 实例。由于本文已在外层按分支调用该实例，距离场只描述当前分支局部块内的结构；但在单个局部块内部，它仍把几何分布压缩为一个整体距离场，不额外编码更细粒度的图连通关系。
+
+\paragraph{比较方式。}对节点 $v$，先取分支 $b_\ell$ 关联分割区域的联合包围盒（外扩若干体素），在该局部块内以阈值 $t=f(v)$ 构造二值内/外场（$f\leq t$ 为内），并提取其 $6$ 连通边界体素；随后以边界体素为种子做 BFS 距离变换，得到局部距离场 $\phi_\ell(v)$，每个体素的值为其到最近边界的距离。距离场刻画了等值面在局部块内的几何分布。参考节点与候选节点的差异由两个距离场的归一化互信息（NMI）给出：
+\begin{equation}
+d_\ell(v_r,v_i)=1-\operatorname{NMI}\bigl(\phi_\ell(v_r),\,\phi_\ell(v_i)\bigr),
+\label{eq:ism}
+\end{equation}
+其中 $\operatorname{NMI}(X,Y)=2\,I(X;Y)/\bigl(H(X)+H(Y)\bigr)$ 由两个距离场的边缘直方图、联合直方图算出的互信息 $I(X;Y)$ 与熵 $H(\cdot)$ 得到（直方图分 $B$ 个 bin）。两个距离场分布高度一致时 NMI 接近 $1$、$d_\ell$ 接近 $0$。对应的几何规模权重取局部块的边界体素数。算法~\ref{alg:ism} 给出其计算过程。
+
+\begin{algorithm}[H]
+\caption{\textsc{BranchDiff} 的 ISM 实例}
+\label{alg:ism}
+\begin{algorithmic}[1]
+\Require 参考节点 $v_r$，候选节点 $v_i$，分支 $b_\ell$，bin 数 $B$
+\Ensure 分支差异 $d_\ell$
+\Function{BranchDiff}{$v_r,v_i,b_\ell$}
+  \ForAll{$v \in \{v_r,\,v_i\}$}
+    \State $t \gets f(v)$；取 $b_\ell$ 分割区域包围盒为局部块
+    \State 以 $f\!\leq\!t$ 建二值场，提取 $6$ 连通边界体素
+    \State BFS 距离变换得局部距离场 $\phi_\ell(v)$
+  \EndFor
+  \State 由 $\phi_\ell(v_r),\phi_\ell(v_i)$ 的 $B$-bin 直方图算 $\operatorname{NMI}$
+  \State \Return $1-\operatorname{NMI}\bigl(\phi_\ell(v_r),\phi_\ell(v_i)\bigr)$
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{局部活性子图的 GNN 向量化差异}
+\label{sec:gnn}
+
+第三种实例化关注分支局部等值面在原始网格上的离散连通结构。前两种度量分别侧重规模与距离场形态，而活性子图进一步保留网格边的邻接关系；本节将分支差异定义为原始网格活性子图的 GNN 向量化距离，使其能够反映等值面截交结构的变化，并为连通关系改变提供一个结构化描述符。
+
+\paragraph{局部活性子图。}等值面 $\{x\mid f(x)=t\}$ 在规则网格上的离散痕迹，是那些被该等值面穿过的网格边。对原始网格边 $(p,q)$，若其两端点标量值跨越阈值 $t=f(v)$，即
+\begin{equation}
+f(p)\leq t<f(q)\quad\text{或}\quad f(q)\leq t<f(p),
+\label{eq:active}
+\end{equation}
+则该边被等值面截穿，称为阈值 $t$ 下的活性边。所有活性边及其端点构成局部活性子图
+\begin{equation}
+G_\ell(v)=\bigl(V_{\mathrm{act}}(v),\,E_{\mathrm{act}}(v)\bigr).
+\end{equation}
+为把比较限制在当前分支，遍历范围由分支 $b_\ell$ 关联弧的分割标签（\texttt{SegmentationId}）集合确定：仅在这些分割区域的联合包围盒内枚举网格边，并要求边的至少一个端点落在目标分割内。由此排除同一阈值下其他分支的无关活性边，使 $G_\ell(v)$ 只反映 $b_\ell$ 上的等值面截交结构。相比直接重建等值面三角网格，活性子图无需插值和三角化，且天然保留了原始网格的连通关系。
+
+\paragraph{节点特征。}活性子图刻画的是局部结构，因此顶点特征应同时编码标量、空间与分割信息，并对全局平移、尺度保持稳定。对每个活性顶点 $p$，构造 $11$ 维特征向量 $x_p$：第 $1$ 维为全局归一化标量 $(f(p)-f_{\min})/(f_{\max}-f_{\min})$；第 $2$、$3$ 维为相对阈值的有符号偏差 $(f(p)-t)$ 及其绝对值（均按标量范围归一化），用于区分顶点位于等值面内侧还是外侧；第 $4$ 至 $6$ 维为顶点相对子图质心的坐标，按子图包围盒对角线长度归一化，从而对平移和尺度不变；第 $7$ 维为按最大网格度数（$6$）归一化的顶点度数；第 $8$ 至 $11$ 维为分割标签的多尺度正余弦编码，使不同分割归属可被区分而又不引入人为的大小顺序。
+
+\paragraph{图编码。}以特征矩阵 $X$ 和活性子图邻接为输入，使用两层图卷积网络（GCN）做对称归一化邻域聚合：
+\begin{equation}
+H^{(1)}=\operatorname{ReLU}\bigl(\hat{A}\,X\,W^{(1)}\bigr),\quad
+H^{(2)}=\operatorname{ReLU}\bigl(\hat{A}\,H^{(1)}\,W^{(2)}\bigr),
+\label{eq:gcn}
+\end{equation}
+其中 $\hat{A}=\tilde{D}^{-1/2}\tilde{A}\,\tilde{D}^{-1/2}$ 为加自环后的对称归一化邻接矩阵，$W^{(1)}\in\mathbb{R}^{11\times h}$、$W^{(2)}\in\mathbb{R}^{h\times h}$ 为 GCN 权重，$h$ 为隐藏维度。两层传播使每个顶点聚合其二跳邻域信息，用于刻画活性子图的局部拓扑。随后对顶点表示 $H^{(2)}$ 做排列不变的读出（readout），拼接均值池化与最大值池化结果，并附加两个对数规模项以保留子图大小信息：
+\begin{equation}
+\begin{aligned}
+z_\ell(v)=\operatorname{normalize}\bigl[\,&\operatorname{mean}(H^{(2)})\,\big\|\,\operatorname{max}(H^{(2)})\,\big\|\\[-2pt]
+&\log(1{+}|V_{\mathrm{act}}|)\,\big\|\,\log(1{+}|E_{\mathrm{act}}|)\,\bigr],
+\end{aligned}
+\label{eq:readout}
+\end{equation}
+其中 $z_\ell(v)\in\mathbb{R}^{2h+2}$，最后经 $L_2$ 归一化，使后续余弦比较只关注向量方向。
+
+\paragraph{权重来源。}为使 GNN 实例不依赖额外标注，本文默认采用确定性固定权重：由固定随机种子按 He 初始化生成 $W^{(1)},W^{(2)}$，训练和测试阶段均保持不变。此时 GCN 可视为一个固定的、排列不变的图结构特征提取器，其差异来自活性子图的邻接关系与节点特征本身。若后续具备更充分的数据，也可以把同一结构扩展为对比学习编码器：以同一活性子图的两次随机增强（如顶点特征扰动、邻域子采样）为正样本对、同一批次内其他子图为负样本，用 InfoNCE / NT-Xent 目标
+\begin{equation}
+\mathcal{L}=-\log\frac{\exp\bigl(\cos(z,z^{+})/\tau\bigr)}{\sum_{z^{-}}\exp\bigl(\cos(z,z^{-})/\tau\bigr)},
+\end{equation}
+训练 GCN，使结构相似的子图在嵌入空间中靠近、不相似者远离，$\tau$ 为温度系数。该学习型版本不改变本文框架的接口，仍输出同一形式的图级向量 $z_\ell(v)$；但在本文方法定义中，默认 backend 为固定权重 GCN，对比学习仅作为可选扩展。
+
+\paragraph{分支差异。}参考节点与候选节点在分支 $b_\ell$ 上的差异由两图级向量的余弦距离给出：
+\begin{equation}
+d_\ell(v_r,v_i)=1-\cos\bigl(z_\ell(v_r),\,z_\ell(v_i)\bigr).
+\end{equation}
+当两个局部活性子图结构高度相似时余弦接近 $1$、$d_\ell$ 接近 $0$；当截交结构发生明显变化（例如活性边集合的连通关系重组）时 $d_\ell$ 通常增大。相比仅使用规模或距离场分布，这一逐分支图描述符为连通结构变化提供了更直接的表达。对应的几何规模权重取活性边数 $|E_{\mathrm{act}}|$。算法~\ref{alg:gnn} 给出其计算过程。
+
+\begin{algorithm}[H]
+\caption{\textsc{BranchDiff} 的 GNN 实例}
+\label{alg:gnn}
+\begin{algorithmic}[1]
+\Require 参考节点 $v_r$，候选节点 $v_i$，分支 $b_\ell$
+\Ensure 分支差异 $d_\ell$
+\Function{BranchDiff}{$v_r,v_i,b_\ell$}
+  \ForAll{$v \in \{v_r,\,v_i\}$}
+    \State $t \gets f(v)$
+    \State 由 $b_\ell$ 的分割标签及包围盒确定区域 $\Omega$
+    \State 按式~\eqref{eq:active} 在 $\Omega$ 内提取活性边 $E_{\mathrm{act}}$
+    \State $V_{\mathrm{act}} \gets E_{\mathrm{act}}$ 端点集；\ $G_\ell(v)\!\gets\!(V_{\mathrm{act}},E_{\mathrm{act}})$
+    \State 为各顶点构造 $11$ 维特征矩阵 $X$
+    \State 两层 GCN 传播：式~\eqref{eq:gcn}
+    \State 池化读出得 $z_\ell(v)$：式~\eqref{eq:readout}
+  \EndFor
+  \State \Return $1-\cos\bigl(z_\ell(v_r),\,z_\ell(v_i)\bigr)$
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{连通分支感知的多分支加权}
+\label{sec:weight}
+
+得到每个活跃分支的差异 $d_\ell$ 后，需要把它们汇总为整体差异 $D$。权重设计的目标是兼顾分支的拓扑重要性与几何规模。
+
+拓扑显著性权重由分支的标量跨度给出。对分支 $b_\ell$，记 $\pi_\ell=f_{\max}(b_\ell)-f_{\min}(b_\ell)$，它可视为持久性思想在本文链段定义下的工程近似；归一化后
+\begin{equation}
+w^{\mathrm{topo}}_\ell=\frac{\pi_\ell}{\sum_{k}\pi_k},
+\label{eq:wtopo}
+\end{equation}
+使标量跨度较大的分支获得更高权重。几何规模权重由分支局部结构的规模 $s_\ell$ 给出并归一化
+\begin{equation}
+w^{\mathrm{geo}}_\ell=\frac{s_\ell}{\sum_{k}s_k},
+\label{eq:wgeo}
+\end{equation}
+其中规模 $s_\ell$ 由所采用的差异度量提供——IoU 取体积集合大小 $|\mathcal{V}_\ell|$，ISM 取局部块边界体素数，GNN 取活性边数 $|E_{\mathrm{act}}|$——使局部结构规模大的分支在同一 backend 内获得更高权重。由于三种 $s_\ell$ 的量纲不同，它们只在各自实例内部归一化使用，不用于跨 backend 直接比较。二者通过混合系数 $\alpha\in[0,1]$ 线性组合并归一化：
+\begin{equation}
+w_\ell=\frac{\alpha\,w^{\mathrm{topo}}_\ell+(1-\alpha)\,w^{\mathrm{geo}}_\ell}
+{\sum_{k}\bigl[\alpha\,w^{\mathrm{topo}}_k+(1-\alpha)\,w^{\mathrm{geo}}_k\bigr]}.
+\label{eq:wmix}
+\end{equation}
+$\alpha=1$ 退化为纯拓扑权重，$\alpha=0$ 退化为纯几何规模权重，$\alpha=0.5$ 时两者各占一半。将 $w_\ell$ 代入式~\eqref{eq:aggregate} 即得当前候选节点的整体差异 $D(v_r,v_i)$，再由链上贪心判定是否保留。当某一标量层级只有单个活跃分支时，$D$ 退化为该分支上的单一差异 $d_\ell$，整体框架与单分支简化保持一致。
+
+两类权重的互补性是这一设计的关键。纯拓扑权重 $w^{\mathrm{topo}}$ 倾向于保护标量跨度大的主分支，但当某条旁支虽然跨度不大、却在当前层级正经历明显截交结构变化时，单靠拓扑权重可能低估它；纯几何规模权重 $w^{\mathrm{geo}}$ 能反映局部结构规模，但若只用它，大分支可能凭借体量持续主导、稀释小而拓扑重要的分支。通过 $\alpha$ 线性混合，可在“保护重要拓扑分支”与“响应局部几何变化”之间取得折中。$\alpha$ 的合适取值与数据特性有关：标量跨度差异显著、希望更强调主干时取较大 $\alpha$；分支尺度差异大、关注局部几何演化时取较小 $\alpha$。
+
+\subsection{复杂度分析}
+
+设合并树节点数为 $|V|$、候选普通节点总数为 $|V_o|$、单个标量层级的活跃分支数为 $q$（通常远小于分支总数）。树重建、结构节点识别与拓扑链分解只需常数次遍历，复杂度为 $O(|V|)$。链上贪心对所有拓扑链的每个候选普通节点各处理一次（各链无重叠，合计 $|V_o|$ 个节点），每次在至多 $q$ 个活跃分支上计算分支差异 $\textsc{BranchDiff}$，因此节点筛选的总代价约为
+\begin{equation}
+O\bigl(|V_o|\,q\,C(\bar{s})\bigr),
+\end{equation}
+其中 $C(\bar{s})$ 为单分支差异的计算代价，依赖于具体度量：
+\begin{itemize}
+\item \textbf{IoU} 实例：$\bar{s}_{\text{IoU}}=|\mathcal{V}_\ell|$ 为分支节点级体积集合大小（通常 $O(10)$–$O(10^2)$），$C=O(\bar{s}_{\text{IoU}})$ 为有序集合交并运算；若替换为体素体积 backend 则 $\bar{s}$ 升至 $O(10^3)$–$O(10^5)$。
+\item \textbf{ISM} 实例：$\bar{s}_{\text{ISM}}$ 为分支局部块体素数（$O(10^3)$–$O(10^5)$），$C=O(\bar{s}_{\text{ISM}})$ 主要由 BFS 距离变换决定，加上 $O(B^2)$ 的联合直方图代价。
+\item \textbf{GNN} 实例：$\bar{s}_{\text{GNN}}=|E_{\text{act}}|$ 为分支活性边数（$O(10^2)$–$O(10^4)$），$C=O(\bar{s}_{\text{GNN}}\,h)$ 由两层 GCN 前向传播主导，$h$ 为隐藏维度。
+\end{itemize}
+三种 \textsc{BranchDiff} 实例的代价量级不同（IoU 最轻、ISM/GNN 通常更重），但它们都把局部结构限制在分支相关区域内，因而 $\bar{s}$ 主要由局部分支规模决定，而非由整场体素总数直接决定；实际运行时间还受活跃分支数、分支局部规模和所选 backend 影响。此外，参考节点的局部描述符（体积集合、距离场或子图嵌入）可在贪心推进时缓存复用，避免重复计算同一参考节点。
+
+\clearpage
+\begin{thebibliography}{99}
+
+\bibitem{lorensen_cline_1987}
+W. E. Lorensen and H. E. Cline.
+Marching cubes: A high resolution 3D surface construction algorithm.
+\textit{Computer Graphics}, 21(4):163--169, 1987.
+
+\bibitem{van_kreveld_1997}
+M. van Kreveld, R. van Oostrum, C. Bajaj, V. Pascucci, and D. Schikore.
+Contour trees and small seed sets for isosurface traversal.
+\textit{Proceedings of the 13th Annual Symposium on Computational Geometry}, pages 212--220, 1997.
+
+\bibitem{carr_contour_2003}
+H. Carr, J. Snoeyink, and U. Axen.
+Computing contour trees in all dimensions.
+\textit{Computational Geometry}, 24(2):75--94, 2003.
+
+\bibitem{edelsbrunner_persistence_2002}
+H. Edelsbrunner, D. Letscher, and A. Zomorodian.
+Topological persistence and simplification.
+\textit{Discrete \& Computational Geometry}, 28(4):511--533, 2002.
+
+\bibitem{carr_geometric_2004}
+H. Carr, J. Snoeyink, and M. van de Panne.
+Simplifying flexible isosurfaces using local geometric measures.
+\textit{IEEE Visualization}, pages 497--504, 2004.
+
+\bibitem{carr_flexible_2010}
+H. Carr, J. Snoeyink, and M. van de Panne.
+Flexible isosurfaces: Simplifying and displaying scalar topology using the contour tree.
+\textit{Computational Geometry}, 43(1):42--58, 2010.
+
+\bibitem{bruckner_ism_2010}
+S. Bruckner and T. M\"oller.
+Isosurface similarity maps.
+\textit{Computer Graphics Forum}, 29(3):773--782, 2010.
+
+\bibitem{gueunet_amt_2017}
+C. Gueunet, P. Fortin, J. Jomier, and J. Tierny.
+Task-based augmented merge trees with Fibonacci heaps.
+\textit{IEEE Symposium on Large Data Analysis and Visualization}, pages 6--15, 2017.
+
+\bibitem{tierny_ttk_2018}
+J. Tierny, G. Favelier, J. A. Levine, C. Gueunet, and M. Michaux.
+The Topology ToolKit.
+\textit{IEEE Transactions on Visualization and Computer Graphics}, 24(1):832--842, 2018.
+
+\bibitem{yan_average_2020}
+L. Yan, Y. Wang, E. Munch, E. Gasparovic, and B. Wang.
+A structural average of labeled merge trees for uncertainty visualization.
+\textit{IEEE Transactions on Visualization and Computer Graphics}, 26(1):832--842, 2020.
+
+\bibitem{pont_wasserstein_2022}
+M. Pont, J. Vidal, J. Delon, and J. Tierny.
+Wasserstein distances, geodesics and barycenters of merge trees.
+\textit{IEEE Transactions on Visualization and Computer Graphics}, 28(1):291--301, 2022.
+
+\bibitem{wetzels_branch_2022}
+F. Wetzels, H. Leitte, and C. Garth.
+Branch decomposition-independent edit distances for merge trees.
+\textit{Computer Graphics Forum}, 41(3):367--378, 2022.
+
+\bibitem{sridharamurthy_local_2023}
+R. Sridharamurthy and V. Natarajan.
+Comparative analysis of merge trees using local tree edit distance.
+\textit{IEEE Transactions on Visualization and Computer Graphics}, 29(2):1518--1530, 2023.
+
+\bibitem{yan_geometry_2023}
+L. Yan, T. B. Masood, F. Rasheed, I. Hotz, and B. Wang.
+Geometry-aware merge tree comparisons for time-varying data with interleaving distances.
+\textit{IEEE Transactions on Visualization and Computer Graphics}, 29(8):3489--3506, 2023.
+
+\bibitem{koepp_temporal_2023}
+W. K\"opp and T. Weinkauf.
+Temporal merge tree maps: A topology-based static visualization for temporal scalar data.
+\textit{IEEE Transactions on Visualization and Computer Graphics}, 29(1):1157--1167, 2023.
+
+\bibitem{li_distributed_2024}
+M. Li, H. Carr, O. R\"ubel, B. Wang, and G. H. Weber.
+Distributed augmentation, hypersweeps, and branch decomposition of contour trees for scientific exploration.
+\textit{IEEE Transactions on Visualization and Computer Graphics}, 2024.
+
+\bibitem{kipf_gcn_2017}
+T. N. Kipf and M. Welling.
+Semi-supervised classification with graph convolutional networks.
+\textit{International Conference on Learning Representations}, 2017.
+
+\bibitem{hamilton_graphsage_2017}
+W. L. Hamilton, R. Ying, and J. Leskovec.
+Inductive representation learning on large graphs.
+\textit{Advances in Neural Information Processing Systems}, 30, 2017.
+
+\bibitem{xu_gin_2019}
+K. Xu, W. Hu, J. Leskovec, and S. Jegelka.
+How powerful are graph neural networks?
+\textit{International Conference on Learning Representations}, 2019.
+
+\end{thebibliography}
+
+\end{document}

@@ -1,0 +1,99 @@
+# ===== macOS =====
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ===== 编辑器 / 工具配置 =====
+.idea/
+.vscode/
+.joycode/
+.claude/
+.codex
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+
+# ===== C++ / CMake 构建产物 =====
+build/
+build-*/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+CMakeScripts/
+cmake_install.cmake
+Makefile
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.pdb
+*.ilk
+compile_commands.json
+
+# ===== LaTeX 中间产物（保留 .tex / .pdf / .bib 源文件与最终 pdf）=====
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.synctex(busy)
+*.bbl
+*.blg
+*.brf
+*.idx
+*.ind
+*.ilg
+*.nav
+*.snm
+*.vrb
+*.run.xml
+*.bcf
+missfont.log
+texput.log
+
+# ===== 备份 / 临时 =====
+*.bak
+*.swp
+*.swo
+*~
+.cache/
+
+# ===== 实验产出 / 数据文件（保留源代码、README、CMakeLists、论文）=====
+# 所有 out / output 输出目录
+**/out/
+**/output/
+
+# idea_ism
+idea_ism/result/
+idea_ism/origin_ism/out/
+
+# idea_multibranch
+idea_multibranch/test_output/
+idea_multibranch/all_results/
+
+# idea_iou —— case 和 eps 实验目录
+idea_iou/all_case/
+idea_iou/case*/
+idea_iou/eps_*/
+
+# idea_graph
+idea_graph/result/
+
+# 大体积数据文件（实验输入/输出常见格式）
+*.vtu
+*.vtp
+*.vtk
