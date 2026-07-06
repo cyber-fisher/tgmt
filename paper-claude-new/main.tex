@@ -57,7 +57,7 @@
 
 \paragraph{等值面。}科学计算、医学影像和流体模拟中的数据常表示为定义在空间域上的标量场 $f:\Omega\rightarrow\mathbb{R}$。给定标量阈值 $\alpha$，其等值面（isosurface）定义为原像 $f^{-1}(\alpha)=\{x\in\Omega\mid f(x)=\alpha\}$，在三维标量场中一般是一张或多张独立的封闭曲面。Marching Cubes 等方法可在规则网格上把 $f^{-1}(\alpha)$ 显式重建为三角网格（triangle mesh），是流场可视化分析中刻画结构的基本工具。\cite{lorensen_cline_1987} 然而逐阈值抽取只能给出孤立层级的几何，难以揭示等值面随阈值连续变化时的全局层次结构。
 
-\paragraph{轮廓树。}拓扑数据分析为此提供了更紧凑的表示。轮廓树（contour tree）通过刻画等值面连通分量随阈值变化的演化，把连续阈值空间压缩为一棵树：它记录等值面 $f^{-1}(\alpha)$ 的连通分量随阈值 $\alpha$ 变化而出生、合并、分裂与消亡的过程。\cite{van_kreveld_1997,carr_contour_2003} 形式上，它可由记录子水平集 $F_\alpha=\{x\in\Omega\mid f(x)\leq\alpha\}$ 连通分量演化的并树（join tree）与记录超水平集演化的分裂树（split tree）合并得到。极值点、鞍点和分支节点对应关键拓扑事件，树边则表示相邻事件之间的演化区间。
+\paragraph{轮廓树。}拓扑数据分析为此提供了更紧凑的表示。轮廓树（contour tree）通过刻画等值面连通分量随阈值变化的演化，把连续阈值空间压缩为一棵树：它记录等值面 $f^{-1}(\alpha)$ 的连通分量随阈值 $\alpha$ 变化而出生、合并、分裂与消亡的过程。\cite{van_kreveld_1997,carr_contour_2003} 形式上，它可由记录子水平集 $F_\alpha=\{x\in\Omega\mid f(x)\leq\alpha\}$ 连通分量演化的并树（join tree）与记录超水平集演化的分裂树（split tree）合并得到。极值点、鞍点和分支节点对应关键拓扑事件，树边则表示相邻事件之间的演化区间。Topology ToolKit（TTK）等工具已将这些结构封装为可与 ParaView、VTK 衔接的工程模块，为轮廓树的计算与增广提供了标准实现。\cite{tierny_ttk_2018}
 
 \paragraph{等值面的亏格与欧拉示性数。}等值面的亏格（genus）$g$ 在拓扑学上的直观含义是一张闭合、可定向曲面上所含“把手”（handles）或“孔洞”（holes）的数量，是刻画其复杂程度的核心拓扑不变量：$g=0$ 对应球面，$g=1$ 对应环面（如甜甜圈或带一个把手的杯子），$g=2$ 对应双环面，$g=n$ 则对应带 $n$ 个相互独立把手的曲面。亏格亦可由 Betti 数刻画——对一张连通闭合可定向曲面，$0$ 维 Betti 数 $\beta_0=1$ 计连通分量、$1$ 维 Betti 数满足 $\beta_1=2g$、$2$ 维 Betti 数 $\beta_2=1$——从而把“把手数”与曲面上独立环路的数量联系起来。\cite{edelsbrunner_harer_2010} 对由 Marching Cubes 抽取的三角网格，亏格通过网格的点、边、面数量联合定义。对一个连通且闭合的等值面网格，其欧拉示性数（Euler characteristic）为
 \begin{equation}
@@ -76,16 +76,16 @@
 \begin{table}[h]
 \centering
 \small
-\caption{三维标量场中各类临界点（Morse 指数 $i$）对等值面欧拉示性数 $\chi$ 的贡献及其拓扑含义。$\chi$ 增减 $(-1)^i$，亏格由 $g=(2c-\chi)/2$ 反推。}
+\caption{三维标量场中各类临界点（Morse 指数 $i$）对等值面欧拉示性数 $\chi$ 的贡献 $\Delta\chi=(-1)^i$。连通分量数 $c$ 与亏格 $g$ 的净变化再由 $\chi=2c-2g$ 统一反推——同一 $\Delta\chi$ 可能来自连通性事件或亏格事件，需结合分量数区分。}
 \label{tab:critical}
-\begin{tabular}{cccl}
+\begin{tabular}{ccl}
 \hline
-类型 & 指数 $i$ & $\Delta\chi$ & 拓扑事件 \\
+类型 & $\Delta\chi$ & 主要拓扑含义 \\
 \hline
-极小值 & $0$ & $+1$ & 连通分量出生 \\
-一阶鞍点 & $1$ & $-1$ & 亏格 $+1$（生成通道/环）\\
-二阶鞍点 & $2$ & $+1$ & 亏格 $-1$（通道闭合）\\
-极大值 & $3$ & $-1$ & 连通分量消亡 \\
+极小值（$i=0$） & $+1$ & 连通分量出生（$c$ 增） \\
+一阶鞍点（$i=1$） & $-1$ & 连通分量合并，或生成通道使 $g$ 增 \\
+二阶鞍点（$i=2$） & $+1$ & 连通分量分裂，或通道闭合使 $g$ 减 \\
+极大值（$i=3$） & $-1$ & 连通分量消亡（$c$ 减） \\
 \hline
 \end{tabular}
 \end{table}
@@ -283,36 +283,49 @@ How powerful are graph neural networks?
   lev/.style={densely dashed, draw=red!70!black, line width=0.6pt},
   lab/.style={font=\scriptsize, text=black!70},
 ]
-% ---- tree with a saddle: two lower edges merge at saddle, one upper edge ----
-\node[crit node] (L1) at (-0.9, 6) {};
-\node[crit node] (L2) at ( 0.9, 6) {};
-\node[sad node]  (S)  at ( 0.0, 3) {$S$};
-\node[crit node] (R)  at ( 0.0, 0) {};
-\draw[main edge] (L1) -- (S);
-\draw[main edge] (L2) -- (S);
-\draw[main edge] (S)  -- (R);
-\node[lab, align=center] at (0,-1.6) {跨鞍点 $S$};
+% ---- tree: 3 minima (low scalar, bottom) merge upward via 2 saddles ----
+% scalar increases upward; low end has 3 components, top has 1
+\node[crit node] (L1) at (-1.6, 0) {};
+\node[crit node] (L2) at ( 0.0, 0) {};
+\node[crit node] (L3) at ( 1.6, 0) {};
+\node[sad node]  (S1) at (-0.8, 2.4) {$S_1$};
+\node[sad node]  (S2) at ( 0.2, 4.4) {$S_2$};
+\node[crit node] (R)  at ( 0.2, 6.4) {};
+\draw[main edge] (L1) -- (S1);
+\draw[main edge] (L2) -- (S1);
+\draw[main edge] (S1) -- (S2);
+\draw[main edge] (L3) -- (S2);
+\draw[main edge] (S2) -- (R);
+\node[lab, left=0.5mm of L1] {$f\!=\!\alpha_1$};
+\node[lab, right=0.5mm of R] {$f\!=\!\alpha_3$};
+\node[lab, align=center] at (0,-1.6) {三分支经\\两鞍点合并};
 
-% level below saddle: two separate components
-\draw[lev] (0,1.5) -- (2.0,1.5);
-% level above saddle: one component
-\draw[lev] (0,4.5) -- (2.0,4.5);
+% three level lines: below S1 (3 comps), between S1,S2 (2 comps), above S2 (1 comp)
+\draw[lev] (-1.6,1.0) -- (3.4,1.0);
+\draw[lev] (-0.6,3.4) -- (3.4,3.4);
+\draw[lev] ( 0.2,5.4) -- (3.4,5.4);
 
-% ---- below saddle: two spheres (2 components, g=0) ----
-\begin{scope}[shift={(3.1,1.5)}]
-  \draw[iso] (-0.35,0) circle (0.28);
-  \draw[iso] ( 0.35,0) circle (0.28);
+% ---- level 1 (bottom): three separate spheres, c=3, g=0 ----
+\begin{scope}[shift={(4.2,1.0)}]
+  \draw[iso] (-0.5,0) circle (0.22);
+  \draw[iso] ( 0.0,0) circle (0.22);
+  \draw[iso] ( 0.5,0) circle (0.22);
 \end{scope}
-\node[lab, align=center, text=green!35!black] at (3.1,-1.6) {鞍点下：两分量\\$c\!=\!2,\ g\!=\!0$};
+\node[lab, align=center, text=green!35!black] at (4.2,-1.6) {$c\!=\!3,\ g\!=\!0$};
 
-% ---- above saddle: one torus (merged, genus 1) ----
-\begin{scope}[shift={(3.1,4.5)}]
-  \draw[iso] (0,0) ellipse (0.6 and 0.34);
-  \draw[iso] (0,0) ellipse (0.24 and 0.13);
+% ---- level 2 (middle): two spheres after S1 merge, c=2, g=0 ----
+\begin{scope}[shift={(4.2,3.4)}]
+  \draw[iso] (-0.32,0) circle (0.30);
+  \draw[iso] ( 0.5,0) circle (0.24);
 \end{scope}
-\node[lab, align=center, text=green!35!black] at (3.1,6.3) {鞍点上：合并\\$c\!=\!1,\ g\!=\!1$};
+
+% ---- level 3 (top): one sphere after S2 merge, c=1, g=0 ----
+\begin{scope}[shift={(4.2,5.4)}]
+  \draw[iso] (0,0) circle (0.40);
+\end{scope}
+\node[lab, align=center, text=green!35!black] at (4.2,6.8) {$c\!=\!1,\ g\!=\!0$};
 \end{tikzpicture}
-\caption{阈值穿过结构节点时拓扑属性跳变。跨越鞍点 $S$ 前后，等值面由两个独立分量（$c=2$，$g=0$）经通道合并/连通性重组为单个更复杂的曲面（$c=1$，$g=1$）；map 在结构节点处切换，故结构节点必须保留。}
+\caption{阈值穿过结构节点（鞍点）时连通性跳变。标量自下（$\alpha_1$）向上（$\alpha_3$）扫掠，等值面的连通分量数经鞍点 $S_1$ 由 $c=3$ 合并为 $c=2$、再经 $S_2$ 合并为 $c=1$（均为球面 $g=0$）。连通性只在结构节点处改变，故结构节点必须保留；此例也说明轮廓树只表达连通性、不直接给出亏格。}
 \label{fig:map-saddle}
 \end{figure}
 

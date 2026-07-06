@@ -1,0 +1,107 @@
+\documentclass[tikz,border=20pt]{standalone}
+\usetikzlibrary{calc, arrows.meta, shadings}
+\usepackage[UTF8]{ctex}
+
+\begin{document}
+\begin{tikzpicture}[
+    y=0.7cm, x=2.5cm,
+    crit node/.style={circle, draw=black, fill=gray!20, thick, inner sep=1pt, minimum size=16pt, font=\sffamily\footnotesize},
+    reg node/.style={circle, draw=black, fill=white, inner sep=0.5pt, minimum size=12pt, font=\sffamily\tiny},
+    main edge/.style={very thick, draw=black!80},
+    xdot/.style={circle, fill=red!85!black, draw=white, line width=0.6pt, inner sep=0pt, minimum size=5pt},
+    lev/.style={densely dashed, draw=red!70!black, line width=0.9pt},
+    lab/.style={font=\sffamily\small, text=black!75},
+]
+
+% ===== 关键点（沿用 ArgumentedTree 的坐标与标量值）=====
+\node[crit node] (C24) at (0, 24) {24};
+\node[crit node] (C22) at (1, 22) {22};
+\node[crit node] (C15) at (0.5, 15) {15};
+\node[crit node] (C13) at (2, 13) {13};
+\node[crit node] (C10) at (1, 10) {10};
+\node[crit node] (C8)  at (2, 8) {8};
+\node[crit node] (C1)  at (0, 1) {1};
+\node[crit node] (C0)  at (0.5, 0) {0};
+
+% ===== 连线与普通节点填充（沿用 ArgumentedTree）=====
+\draw[main edge] (C15) -- (C24);
+\foreach \v in {17, 18, 20, 23} \path (C15) -- (C24) node[pos={(\v-15)/(24-15)}, reg node] {\v};
+
+\draw[main edge] (C15) -- (C22);
+\foreach \v in {16, 19, 21} \path (C15) -- (C22) node[pos={(\v-15)/(22-15)}, reg node] {\v};
+
+\draw[main edge] (C1) -- (C15);
+\foreach \v in {3, 6, 7, 14} \path (C1) -- (C15) node[pos={(\v-1)/(15-1)}, reg node] {\v};
+
+\draw[main edge] (C10) -- (C15);
+\foreach \v in {11, 12} \path (C10) -- (C15) node[pos={(\v-10)/(15-10)}, reg node] {\v};
+
+\draw[main edge] (C10) -- (C13);
+
+\draw[main edge] (C8) -- (C10);
+
+\draw[main edge] (C0) -- (C10);
+\foreach \v in {2, 4, 5, 9} \path (C0) -- (C10) node[pos={(\v-0)/(10-0)}, reg node] {\v};
+
+% ===== 三条等值层级：横穿树身，交点数 = 连通分量数 =====
+% t1=9 : 交弧 (0,10)@x0.95, (8,10)@x1.5, (1,15)@x0.286  -> c=3
+% t2=14: 交弧 (1,15)@x0.464, (10,15)@x0.6               -> c=2
+% t3=23: 交弧 (15,24)@x0.056                            -> c=1
+\draw[lev] (-0.30,9)  -- (2.55,9);
+\draw[lev] (-0.30,14) -- (2.55,14);
+\draw[lev] (-0.30,23) -- (2.55,23);
+
+\node[lab, text=red!70!black] at (-0.55,9)  {$t_1$};
+\node[lab, text=red!70!black] at (-0.55,14) {$t_2$};
+\node[lab, text=red!70!black] at (-0.55,23) {$t_3$};
+
+% 交点（等值面截穿树边处）
+\node[xdot] at (0.286,9) {}; \node[xdot] at (0.95,9) {}; \node[xdot] at (1.5,9) {};
+\node[xdot] at (0.464,14) {}; \node[xdot] at (0.6,14) {};
+\node[xdot] at (0.056,23) {};
+
+% 从交点到右侧 3D 等值面的引导线
+\foreach \y in {9,14,23} \draw[densely dotted, draw=black!30, line width=0.5pt] (2.55,\y) -- (2.95,\y);
+
+% ===== 右侧：3D 体数据等值面（连通分量）=====
+% iso3d 宏：球面径向渐变高光 + 底部椭圆阴影，模拟体数据抽取的等值面壳
+\newcommand{\isothree}[3]{% x y r
+  \shade[ball color=green!55!black] (#1,#2) circle (#3);
+  \draw[green!30!black, line width=0.4pt] (#1,#2) circle (#3);
+}
+
+% ---- t1 层级：c=3（三个独立的等值面壳）----
+\begin{scope}[shift={(3.7,9)}, x=1cm, y=1cm]
+  \isothree{-0.62}{0.28}{0.34}
+  \isothree{0.5}{0.42}{0.30}
+  \isothree{0.02}{-0.42}{0.38}
+  \node[font=\sffamily\footnotesize, text=black!70, align=center] at (0,-1.3)
+     {$c=3$：三个独立分量};
+\end{scope}
+
+% ---- t2 层级：c=2 ----
+\begin{scope}[shift={(3.7,14)}, x=1cm, y=1cm]
+  \isothree{-0.42}{0.05}{0.52}
+  \isothree{0.6}{-0.38}{0.30}
+  \node[font=\sffamily\footnotesize, text=black!70, align=center] at (0,-1.3)
+     {$c=2$：一分量封顶消失};
+\end{scope}
+
+% ---- t3 层级：c=1 ----
+\begin{scope}[shift={(3.7,23)}, x=1cm, y=1cm]
+  \isothree{0}{0}{0.72}
+  \node[font=\sffamily\footnotesize, text=black!70, align=center] at (0,-1.3)
+     {$c=1$：仅剩单一分量};
+  \node[font=\sffamily\footnotesize, text=black!55] at (0,1.4) {3D 体数据等值面};
+\end{scope}
+
+% ===== 标量方向箭头 =====
+\draw[-{Stealth[length=2.6mm]}, line width=1pt, black!55] (4.85,7) -- (4.85,25);
+\node[font=\sffamily\small, text=black!60, rotate=-90] at (5.1,16) {标量 $f$ 增大};
+
+% ===== 标题 =====
+\node[font=\sffamily\bfseries\large, align=center] at (2.1,-2.6)
+   {增广轮廓树与等值面连通性（$c:3\!\to\!2\!\to\!1$）};
+
+\end{tikzpicture}
+\end{document}
