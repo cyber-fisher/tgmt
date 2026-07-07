@@ -11,6 +11,9 @@
     xdot/.style={circle, fill=red!85!black, draw=white, line width=0.6pt, inner sep=0pt, minimum size=5pt},
     lev/.style={densely dashed, draw=red!70!black, line width=0.9pt},
     lab/.style={font=\sffamily\small, text=black!75},
+    iso3d/.style={very thick, draw=green!45!black},
+    sev/.style={dash pattern=on 4pt off 2pt, draw=green!45!black, line width=0.9pt},
+    sdot/.style={circle, fill=green!55!black, draw=white, line width=0.6pt, inner sep=0pt, minimum size=6pt},
 ]
 
 % ===== 关键点（沿用 ArgumentedTree 的坐标与标量值）=====
@@ -60,48 +63,143 @@
 \node[xdot] at (0.464,14) {}; \node[xdot] at (0.6,14) {};
 \node[xdot] at (0.056,23) {};
 
-% 从交点到右侧 3D 等值面的引导线
-\foreach \y in {9,14,23} \draw[densely dotted, draw=black!30, line width=0.5pt] (2.55,\y) -- (2.95,\y);
+% ===== 鞍点合并事件层级：恰好穿过结构节点 C15、C10 =====
+% 这两条层级正好落在鞍点上，是连通性跳变（两分量合并）的临界高度。
+\draw[sev] (-0.30,15) -- (2.55,15);
+\draw[sev] (-0.30,10) -- (2.55,10);
+\node[lab, text=green!45!black] at (-0.55,15) {$S_1$};
+\node[lab, text=green!45!black] at (-0.55,10) {$S_2$};
+% 鞍点合并标记（绿色空心圆环套在节点外圈，避免遮住节点数值）
+\node[circle, draw=green!55!black, line width=1.4pt, fill=none,
+      inner sep=0pt, minimum size=20pt] at (0.5,15) {};
+\node[circle, draw=green!55!black, line width=1.4pt, fill=none,
+      inner sep=0pt, minimum size=20pt] at (1,10) {};
+% S2 层级除合并鞍点外，还穿过左侧边 C1--C15（x≈0.321），对应一个独立分量
+\node[xdot] at (0.321,10) {};
 
-% ===== 右侧：3D 体数据等值面（连通分量）=====
-% iso3d 宏：球面径向渐变高光 + 底部椭圆阴影，模拟体数据抽取的等值面壳
-\newcommand{\isothree}[3]{% x y r
-  \shade[ball color=green!55!black] (#1,#2) circle (#3);
-  \draw[green!30!black, line width=0.4pt] (#1,#2) circle (#3);
+% ===== 映射箭头：左侧轮廓树层级 → 右侧等值面（map）=====
+% 右侧等值面按“标量值递增”顺序均匀分布到 5 个竖直槽位，避免真实 y 值相邻
+% （9/10、14/15）导致的图形重叠；每支曲线引导线从左侧真实层级 y 值连到对应槽位。
+% 槽位分配（按标量顺序）：t1->5, S2->11, t2->17, S1->23, t3->29
+% 引导线：普通层级蓝色，鞍点层级绿色
+\draw[-{Stealth[length=2.4mm, width=2mm]}, line width=0.9pt, draw=blue!55!black]
+      (2.62,9)  .. controls (3.2,9)  and (3.2,5)  .. (3.55,5);
+\draw[-{Stealth[length=2.4mm, width=2mm]}, line width=0.9pt, draw=green!45!black]
+      (2.62,10) .. controls (3.2,10) and (3.2,11) .. (3.55,11);
+\draw[-{Stealth[length=2.4mm, width=2mm]}, line width=0.9pt, draw=blue!55!black]
+      (2.62,14) .. controls (3.2,14) and (3.2,17) .. (3.55,17);
+\draw[-{Stealth[length=2.4mm, width=2mm]}, line width=0.9pt, draw=green!45!black]
+      (2.62,15) .. controls (3.2,15) and (3.2,23) .. (3.55,23);
+\draw[-{Stealth[length=2.4mm, width=2mm]}, line width=0.9pt, draw=blue!55!black]
+      (2.62,23) .. controls (3.2,23) and (3.2,29) .. (3.55,29);
+% 映射符号标注
+\node[font=\sffamily\small\itshape, text=blue!55!black] at (3.05,17.8) {map};
+
+% ===== 右侧：3D 体数据等值面（连通分量 + 亏格）=====
+% 多个不同的不规则等值线宏，避免各分量形状雷同；均含一个不规则“洞”表达亏格 g=1。
+% blobA：横向拉长、右侧凸起
+\newcommand{\blobA}[3]{%
+  \begin{scope}[shift={(#1,#2)}, scale=#3, x=1cm, y=1cm]
+    \draw[iso3d] plot[smooth cycle, tension=0.75]
+      coordinates {(0,0.55)(0.5,0.5)(0.85,0.1)(0.6,-0.28)
+                   (0.7,-0.5)(0.1,-0.55)(-0.4,-0.42)(-0.72,-0.05)
+                   (-0.5,0.35)};
+    \draw[iso3d] plot[smooth cycle, tension=0.8]
+      coordinates {(0.12,0.14)(0.28,0.0)(0.16,-0.16)(-0.06,-0.12)(-0.1,0.06)};
+  \end{scope}
+}
+% blobB：竖向、左上凹陷
+\newcommand{\blobB}[3]{%
+  \begin{scope}[shift={(#1,#2)}, scale=#3, x=1cm, y=1cm]
+    \draw[iso3d] plot[smooth cycle, tension=0.7]
+      coordinates {(0,0.78)(0.35,0.5)(0.5,0.05)(0.4,-0.45)
+                   (0.05,-0.7)(-0.4,-0.5)(-0.55,-0.05)(-0.28,0.3)(-0.5,0.62)};
+    \draw[iso3d] plot[smooth cycle, tension=0.8]
+      coordinates {(-0.02,0.22)(0.16,0.1)(0.12,-0.14)(-0.12,-0.16)(-0.18,0.04)};
+  \end{scope}
+}
+% blobC：多凸角、不规则
+\newcommand{\blobC}[3]{%
+  \begin{scope}[shift={(#1,#2)}, scale=#3, x=1cm, y=1cm]
+    \draw[iso3d] plot[smooth cycle, tension=0.72]
+      coordinates {(0,0.68)(0.55,0.42)(0.42,0.0)(0.72,-0.35)
+                   (0.2,-0.62)(-0.28,-0.55)(-0.62,-0.2)(-0.45,0.25)(-0.6,0.55)};
+    \draw[iso3d] plot[smooth cycle, tension=0.8]
+      coordinates {(0.04,0.18)(0.22,0.06)(0.18,-0.16)(-0.06,-0.2)(-0.2,-0.02)(-0.12,0.14)};
+  \end{scope}
 }
 
-% ---- t1 层级：c=3（三个独立的等值面壳）----
-\begin{scope}[shift={(3.7,9)}, x=1cm, y=1cm]
-  \isothree{-0.62}{0.28}{0.34}
-  \isothree{0.5}{0.42}{0.30}
-  \isothree{0.02}{-0.42}{0.38}
-  \node[font=\sffamily\footnotesize, text=black!70, align=center] at (0,-1.3)
-     {$c=3$：三个独立分量};
+% ---- t1 层级（槽位 y=5）：c=3（三个形状各异、彼此分离的不规则等值面，各自 g=1）----
+\begin{scope}[shift={(4.35,5)}, x=1cm, y=1cm]
+  \node[font=\sffamily\footnotesize\bfseries, text=red!70!black] at (-1.55,0) {$t_1$};
+  \blobA{-1.05}{0.15}{0.42}
+  \blobB{0.15}{0.5}{0.40}
+  \blobC{0.35}{-0.55}{0.45}
+  \node[font=\sffamily\footnotesize, text=black!70, align=center] at (-0.2,-1.15)
+     {$c=3,\ g=1$：三个独立分量};
 \end{scope}
 
-% ---- t2 层级：c=2 ----
-\begin{scope}[shift={(3.7,14)}, x=1cm, y=1cm]
-  \isothree{-0.42}{0.05}{0.52}
-  \isothree{0.6}{-0.38}{0.30}
-  \node[font=\sffamily\footnotesize, text=black!70, align=center] at (0,-1.3)
-     {$c=2$：一分量封顶消失};
+% ---- t2 层级（槽位 y=17）：c=2 ----
+\begin{scope}[shift={(4.35,17)}, x=1cm, y=1cm]
+  \node[font=\sffamily\footnotesize\bfseries, text=red!70!black] at (-1.55,0) {$t_2$};
+  \blobB{-0.5}{0.05}{0.72}
+  \blobA{0.75}{-0.35}{0.5}
+  \node[font=\sffamily\footnotesize, text=black!70, align=center] at (0,-1.15)
+     {$c=2,\ g=1$：一分量封顶消失};
 \end{scope}
 
-% ---- t3 层级：c=1 ----
-\begin{scope}[shift={(3.7,23)}, x=1cm, y=1cm]
-  \isothree{0}{0}{0.72}
-  \node[font=\sffamily\footnotesize, text=black!70, align=center] at (0,-1.3)
-     {$c=1$：仅剩单一分量};
-  \node[font=\sffamily\footnotesize, text=black!55] at (0,1.4) {3D 体数据等值面};
+% ---- t3 层级（槽位 y=29）：c=1 ----
+\begin{scope}[shift={(4.35,29)}, x=1cm, y=1cm]
+  \node[font=\sffamily\footnotesize\bfseries, text=red!70!black] at (-1.55,0) {$t_3$};
+  \blobC{0}{0}{1.05}
+  \node[font=\sffamily\footnotesize, text=black!70, align=center] at (0,-1.15)
+     {$c=1,\ g=1$：仅剩单一分量};
+\end{scope}
+
+% ===== 鞍点合并瞬间的等值面：两个不规则分量在此刚好相切/贴合成一个 =====
+% mergeiso 宏：左右两个不规则分量在中间收窄成一个“颈”，正好相切贴合，
+% 体现穿过合并鞍点时两分量合二为一的临界拓扑（8字形 / 哑铃颈）。
+\newcommand{\mergeiso}[3]{% x y scale
+  \begin{scope}[shift={(#1,#2)}, scale=#3, x=1cm, y=1cm]
+    \draw[iso3d] plot[smooth cycle, tension=0.7]
+      coordinates {(0,0.16)(-0.32,0.42)(-0.78,0.35)(-0.92,-0.05)
+                   (-0.72,-0.42)(-0.28,-0.4)(0,-0.16)(-0.06,0)};
+    \draw[iso3d] plot[smooth cycle, tension=0.7]
+      coordinates {(0,0.16)(0.3,0.4)(0.7,0.36)(0.9,0.0)
+                   (0.72,-0.44)(0.26,-0.42)(0,-0.16)(0.06,0)};
+    \node[circle, fill=red!80!black, draw=white, line width=0.4pt,
+          inner sep=0pt, minimum size=3.4pt] at (0,0) {};
+    \draw[iso3d] (-0.48,-0.02) ellipse (0.14 and 0.10);
+    \draw[iso3d] ( 0.48,-0.02) ellipse (0.14 and 0.10);
+  \end{scope}
+}
+
+% ---- S1 = 15 层级：两分量在鞍点合并 ----
+\begin{scope}[shift={(4.35,23)}, x=1cm, y=1cm]
+  \node[font=\sffamily\footnotesize\bfseries, text=green!45!black] at (-1.55,0) {$S_1$};
+  \mergeiso{0}{0}{0.9}
+  \node[font=\sffamily\footnotesize, text=black!70, align=center] at (0,-1.1)
+     {鞍点 $S_1$（$f\!=\!15$）：两分量相切合并};
+\end{scope}
+
+% ---- S2 = 10 层级：两分量在鞍点合并，另有一个独立分量 ----
+\begin{scope}[shift={(4.35,11)}, x=1cm, y=1cm]
+  \node[font=\sffamily\footnotesize\bfseries, text=green!45!black] at (-1.55,0) {$S_2$};
+  \mergeiso{-0.35}{0.15}{0.72}
+  % 独立分量：不参与本次合并，单独存在于该高度
+  \blobA{0.95}{-0.15}{0.42}
+  \node[font=\sffamily\footnotesize, text=black!70, align=center] at (0,-1.05)
+     {鞍点 $S_2$（$f\!=\!10$）：两分量合并 $+$ 一独立分量};
 \end{scope}
 
 % ===== 标量方向箭头 =====
-\draw[-{Stealth[length=2.6mm]}, line width=1pt, black!55] (4.85,7) -- (4.85,25);
-\node[font=\sffamily\small, text=black!60, rotate=-90] at (5.1,16) {标量 $f$ 增大};
+\draw[-{Stealth[length=2.6mm]}, line width=1pt, black!55] (6.05,3.5) -- (6.05,30.5);
+\node[font=\sffamily\small, text=black!60, rotate=-90] at (6.3,17) {标量 $f$ 增大};
+\node[font=\sffamily\footnotesize, text=black!55] at (4.35,31.5) {3D 体数据等值面（不规则轮廓，$g\!=\!1$）};
 
 % ===== 标题 =====
 \node[font=\sffamily\bfseries\large, align=center] at (2.1,-2.6)
-   {增广轮廓树与等值面连通性（$c:3\!\to\!2\!\to\!1$）};
+   {增广轮廓树与等值面连通性（$c:3\!\to\!2\!\to\!1$，不规则等值面 $g\!=\!1$）};
 
 \end{tikzpicture}
 \end{document}
