@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>如何从轮廓树计算等值面亏格</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --paper: #ffffff;
+      --text: #1f2937;
+      --muted: #5f6b7a;
+      --line: #d9e2ec;
+      --accent: #2563eb;
+      --accent-soft: #e8f0ff;
+      --code-bg: #0f172a;
+      --code-text: #e2e8f0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.72;
+    }
+    main {
+      width: min(980px, calc(100% - 32px));
+      margin: 32px auto;
+      padding: 44px 52px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+    }
+    h1, h2, h3 { line-height: 1.28; color: #111827; }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 34px;
+      text-align: center;
+      letter-spacing: 0.02em;
+    }
+    .subtitle {
+      margin: 0 0 28px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 16px;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      font-size: 23px;
+    }
+    h3 { margin-top: 24px; font-size: 18px; }
+    p { margin: 12px 0; }
+    blockquote {
+      margin: 22px 0;
+      padding: 16px 18px;
+      border-left: 5px solid var(--accent);
+      background: var(--accent-soft);
+      border-radius: 10px;
+    }
+    code {
+      padding: 0.12em 0.35em;
+      border-radius: 5px;
+      background: #eef2f7;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+    pre {
+      overflow-x: auto;
+      padding: 18px;
+      border-radius: 12px;
+      background: var(--code-bg);
+      color: var(--code-text);
+      line-height: 1.55;
+    }
+    pre code { padding: 0; background: transparent; color: inherit; }
+    .math {
+      margin: 14px 0;
+      padding: 10px 14px;
+      text-align: center;
+      border-radius: 10px;
+      background: #f8fafc;
+      border: 1px solid #edf2f7;
+      font-family: ui-serif, Georgia, "Times New Roman", serif;
+      font-size: 1.08em;
+    }
+    table {
+      width: 100%;
+      margin: 18px 0;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      vertical-align: top;
+    }
+    th { background: #eaf2ff; text-align: left; }
+    tr:nth-child(even) td { background: #fbfdff; }
+    ul, ol { padding-left: 1.35em; }
+    li { margin: 6px 0; }
+    .footer {
+      margin-top: 42px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+    @media print {
+      body { background: #fff; }
+      main { margin: 0; width: 100%; border: none; box-shadow: none; border-radius: 0; }
+      h2 { break-after: avoid; }
+      table, pre, blockquote { break-inside: avoid; }
+    }
+    @media (max-width: 680px) {
+      main { padding: 28px 22px; }
+      h1 { font-size: 28px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>如何从轮廓树计算等值面亏格</h1>
+  <p class="subtitle">基于 Morse 理论、Euler 示性数与轮廓树增强标注的落地方案</p>
+
+  <blockquote>
+    <strong>结论先行：</strong>仅凭“轮廓树的连接形状”无法唯一推出等值面的亏格。可落地做法是把轮廓树作为等值面连通分量的演化骨架，再在构树或遍历过程中为每条弧补充 Euler 示性数 χ、连通分量数 c、弧上等值面样本或临界点贡献等辅助信息，最后用 g = c - χ / 2（闭合可定向曲面）或逐分量 g<sub>k</sub> = 1 - χ<sub>k</sub> / 2 得到亏格。
+  </blockquote>
+
+  <h2>1. 问题定义：要计算什么</h2>
+  <p>输入是定义在三维体数据或四面体网格上的标量场：</p>
+  <div class="math">f: M → ℝ</div>
+  <p>以及已经构建好的轮廓树 <code>CT</code>。对任意一个等值 h，等值面：</p>
+  <div class="math">S<sub>h</sub> = f<sup>-1</sup>(h)</div>
+  <p>可能包含多个不相交的闭合曲面分量。目标不是只判断“有没有孔”，而是为轮廓树上的每条弧 <code>e</code> 标注：</p>
+  <ul>
+    <li>该弧对应的等值面连通分量或分量集合；</li>
+    <li>该弧内部任意正则等值 h 的 Euler 示性数 χ(e)；</li>
+    <li>连通分量数 c(e)；</li>
+    <li>亏格 g(e)，以及必要时的逐分量亏格列表。</li>
+  </ul>
+  <p>在医学 CT、材料孔隙、流体模拟等数据里，h 沿标量值变化时，只有穿过临界点时拓扑才会变化；在同一条轮廓树弧内部，等值面拓扑保持同胚，因此亏格保持不变。</p>
+
+  <h2>2. 数学关系：亏格、Euler 示性数与连通分量</h2>
+  <p>对一个闭合、可定向、无边界的连通二维曲面，Euler 示性数与亏格满足：</p>
+  <div class="math">χ = V - E + F = 2 - 2g</div>
+  <div class="math">g = (2 - χ) / 2</div>
+  <p>若等值面包含 c 个互不相连的闭合曲面分量，总 Euler 示性数为各分量之和：</p>
+  <div class="math">χ<sub>total</sub> = Σχ<sub>k</sub></div>
+  <div class="math">g<sub>total</sub> = Σg<sub>k</sub> = c - χ<sub>total</sub> / 2</div>
+  <p>工程实现中最稳妥的换算方式是：先得到每个正则等值或每条轮廓树弧的 χ 与 c，再换算亏格。</p>
+  <p>如果表面有边界、非定向、网格破洞或提取算法产生非流形边，上式需要先修补，或改用带边界公式：</p>
+  <div class="math">χ = 2c - 2g - b</div>
+  <p>其中 b 是边界环数量。</p>
+
+  <h2>3. 为什么轮廓树本身不够</h2>
+  <p>轮廓树压缩记录的是等值面连通分量随标量值的合并、分裂、诞生和消亡。它能告诉我们“哪个等值面分量连接到哪个分量”，但通常不会保留等值面内部是否绕出把手的信息。</p>
+  <ul>
+    <li>两个不同标量场可能有相同的轮廓树结构，但某些弧对应的等值面一个是球面、另一个是环面。</li>
+    <li>轮廓树节点能提示拓扑事件发生的位置，不能单独给出事件对 χ 或 g 的净贡献。</li>
+    <li>要计算亏格，必须在构树时保留临界点类型、局部上下链接，或在弧上抽样等值面并计算网格 Euler 示性数。</li>
+  </ul>
+  <p>因此，“从轮廓树计算亏格”的准确表述应是：从增强后的轮廓树，或从“轮廓树 + 原始标量场/网格”，计算每条弧对应等值面分量的亏格。</p>
+
+  <h2>4. 可落地算法方案</h2>
+  <h3>方案 A：弧上抽样等值面，直接算 χ</h3>
+  <p>这是最稳、最容易实现的方案。</p>
+  <ol>
+    <li>对每条轮廓树弧 e = (u, v)，选择一个正则等值 h，满足 f(u) &lt; h &lt; f(v)，且不等于任何顶点标量值。</li>
+    <li>用 Marching Cubes、Flying Edges 或 TTK/VTK 的等值面提取算法生成 S<sub>h</sub>。</li>
+    <li>按连通分量分割三角网格，统计每个分量的 V、E、F。其中 E 要按无向唯一边计数。</li>
+    <li>计算 χ<sub>k</sub> = V<sub>k</sub> - E<sub>k</sub> + F<sub>k</sub>，g<sub>k</sub> = 1 - χ<sub>k</sub> / 2。</li>
+    <li>把结果写回轮廓树弧属性：<code>sample_iso</code>、<code>component_count</code>、<code>euler_char</code>、<code>genus_list</code>、<code>genus_total</code>。</li>
+  </ol>
+  <p><strong>优点：</strong>鲁棒、容易验证，不需要完全解析所有临界点类型。</p>
+  <p><strong>缺点：</strong>每条弧都要抽样提面，耗时较高；如果体数据很大，可只对候选弧或简化树后的弧计算。</p>
+
+  <h3>方案 B：构树时累加临界点贡献</h3>
+  <p>这是最快但实现要求更高的方案。</p>
+  <ol>
+    <li>对标量场进行 Simulation of Simplicity 或符号扰动，保证临界值全序且临界点尽量 Morse 化。</li>
+    <li>对每个临界点计算上下链接（lower link / upper link），识别 minimum、maximum、1-saddle、2-saddle，以及 join/split 事件。</li>
+    <li>沿标量方向扫掠轮廓树，在弧属性中传播 χ 与 c。</li>
+    <li>普通弧内部 χ 不变；穿过临界点时按局部事件更新。</li>
+    <li>在合并/分裂鞍点处，同时维护分量身份，避免只累加一个全局 χ 导致无法得到逐分量亏格。</li>
+    <li>对每条弧用 g = c - χ / 2 输出总亏格；如果保存了分量级 χ<sub>k</sub>，则输出逐分量亏格。</li>
+  </ol>
+  <p>方案 B 适合嵌入自研轮廓树构建器或 TTK 管线中，但必须严肃处理 1-saddle/2-saddle、非 Morse 多重鞍点、边界和非流形情况。</p>
+
+  <h2>5. 临界点贡献表</h2>
+  <table>
+    <thead>
+      <tr><th>事件</th><th>轮廓树表现</th><th>扫掠含义</th><th>对 χ/c 的典型影响</th><th>亏格影响</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Minimum</td><td>底部叶子</td><td>新分量诞生</td><td>c + 1，χ + 2（闭合小球刚形成后）</td><td>g = 0</td></tr>
+      <tr><td>Maximum</td><td>顶部叶子</td><td>分量消亡</td><td>c - 1，χ - 2</td><td>移除该分量</td></tr>
+      <tr><td>Merge/Split saddle</td><td>内部度数节点</td><td>两个分量合并或一个分量分裂</td><td>c 改变 ±1；χ 按局部手柄/分裂事件更新</td><td>可能不变，也可能改变</td></tr>
+      <tr><td>Handle saddle</td><td>内部度数节点</td><td>同一分量长出或闭合把手</td><td>c 不变，χ - 2（长把手）或 χ + 2（闭合把手）</td><td>g + 1 或 g - 1</td></tr>
+    </tbody>
+  </table>
+  <p>注意：源材料中把 minimum 贡献写成 <code>+1</code>、1-saddle 写成 <code>-1</code>、2-saddle 写成 <code>+1</code> 的说法，更接近对“下水平集/胞腔”Euler 特征的 Morse 指数交替贡献，而不是闭合等值面自身的直接 χ。若目标是等值面亏格，推荐以等值面网格 χ 或严格的局部等值面事件公式为准。</p>
+
+  <h2>6. 实现细节与伪代码</h2>
+  <p>推荐先实现方案 A，形成可验证的基线，再把热点弧替换为方案 B 的增量传播。</p>
+  <pre><code>for arc in contour_tree.arcs:
+    h = choose_regular_value(arc.low.value, arc.high.value)
+    mesh = extract_isosurface(volume_or_tetmesh, h)
+    comps = connected_components(mesh)
+
+    arc.euler = 0
+    arc.component_count = len(comps)
+    arc.genus_list = []
+
+    for comp in comps:
+        V = count_unique_vertices(comp)
+        E = count_unique_undirected_edges(comp)
+        F = count_faces(comp)
+
+        chi = V - E + F
+        genus = 1 - chi / 2
+
+        arc.euler += chi
+        arc.genus_list.append(genus)
+
+    arc.genus_total = sum(arc.genus_list)
+
+    # 对闭合可定向曲面，也可使用：
+    # arc.genus_total = arc.component_count - arc.euler / 2</code></pre>
+  <p>关键实现点：</p>
+  <ul>
+    <li>唯一边计数：三角形 <code>(a, b, c)</code> 贡献 <code>(min(a,b), max(a,b))</code>、<code>(min(b,c), max(b,c))</code>、<code>(min(c,a), max(c,a))</code> 三条无向边，放入 <code>set</code> 去重。</li>
+    <li>正则值选择：取弧两端标量中点；若中点恰好等于某顶点值，则加入极小 <code>epsilon</code> 偏移。</li>
+    <li>弧与等值面分量映射：如果抽样得到多个分量，需要用轮廓树的分量标识或空间连通分割确认哪些分量属于该弧。</li>
+    <li>浮点鲁棒性：等值面提取前可对标量做稳定排序；避免 h 落在平台值或多顶点相同值上。</li>
+  </ul>
+
+  <h2>7. 非 Morse 情况和工程边界</h2>
+  <ul>
+    <li><strong>非 Morse 临界点：</strong>真实体数据常出现多个邻接单元同值或高阶鞍点。应先用 SoS、微扰、jitter 或稳定 tie-break 将其拆为一串二元事件。</li>
+    <li><strong>边界数据：</strong>如果标量场定义在有边界区域，等值面可能有开口，需要统计边界环 b，用 χ = 2c - 2g - b 换算。</li>
+    <li><strong>非流形网格：</strong>Marching Cubes 的歧义面、重复顶点、T-junction 会污染 V/E/F，应先 weld 顶点并检查每条边邻接面数量。</li>
+    <li><strong>简化轮廓树：</strong>拓扑简化会删除小持久性分支，弧亏格也应随简化策略重新合并或重新抽样计算。</li>
+    <li><strong>Jacobi / Reeb 图差异：</strong>在含环定义域上，Reeb 图比轮廓树更一般；如果定义域本身不是 simply connected，轮廓树假设要重新检查。</li>
+  </ul>
+
+  <h2>8. 最小验证用例</h2>
+  <table>
+    <thead>
+      <tr><th>数据/等值面</th><th>χ</th><th>c</th><th>期望亏格</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>单球面</td><td>2</td><td>1</td><td>0</td></tr>
+      <tr><td>两个不相交球面</td><td>4</td><td>2</td><td>0 + 0 = 0</td></tr>
+      <tr><td>单环面/甜甜圈</td><td>0</td><td>1</td><td>1</td></tr>
+      <tr><td>双环面</td><td>-2</td><td>1</td><td>2</td></tr>
+      <tr><td>球面 + 环面</td><td>2 + 0 = 2</td><td>2</td><td>1</td></tr>
+    </tbody>
+  </table>
+  <p>验收建议：先人工构造这些隐式场或网格，确认提取、连通分割、V/E/F 计数和 g 换算全部正确，再接入真实轮廓树。</p>
+
+  <h2>9. 推荐落地路线</h2>
+  <ol>
+    <li>第一阶段：保留现有轮廓树构建流程，对每条弧抽样等值面并直接计算 V/E/F，得到可验证的 <code>genus</code> 标签。</li>
+    <li>第二阶段：将 <code>genus</code> 标签与弧持久性、弧长度、体积、面积等指标一起输出，用于筛选“拓扑复杂但体积小”的噪声结构。</li>
+    <li>第三阶段：在性能成为瓶颈后，才引入临界点增量传播；用第一阶段结果作为回归测试。</li>
+    <li>第四阶段：把非 Morse 拆解、边界环统计、网格流形检查做成独立 QA 模块，避免亏格标签被坏网格污染。</li>
+  </ol>
+
+  <h2>10. 参考线索</h2>
+  <ul>
+    <li>Carr, Snoeyink, Axen: <em>Computing Contour Trees in All Dimensions</em>。轮廓树构建与高维推广的经典资料。</li>
+    <li>Carr, Snoeyink, van de Panne: <em>Simplifying Flexible Isosurfaces Using Local Geometric Measures</em>。讨论等值面与拓扑简化。</li>
+    <li>Carr, Snoeyink, van de Panne: <em>Flexible Isosurfaces</em>。可结合项目内 <code>reference_doc/2010_Flexible_isosurfaces_论文详解_Typora公式中文术语版.md</code> 阅读。</li>
+    <li>van Kreveld 等：<em>Contour trees and small seed sets for isosurface traversal</em>。与等值面遍历、种子集相关。</li>
+    <li>TTK 文档与示例：<code>ContourTree</code>、<code>FTMTree</code>、<code>TopologicalSimplification</code>、<code>MarchingTetrahedra</code> 等模块可作为工程参考。</li>
+  </ul>
+
+  <p class="footer">如何从轮廓树计算等值面亏格 · Markdown / HTML / DOCX 同步版本</p>
+</main>
+</body>
+</html>

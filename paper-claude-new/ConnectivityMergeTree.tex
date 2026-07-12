@@ -14,7 +14,8 @@
     mapdot/.style={ellipse, fill=black!75, text=white, line width=1pt, inner sep=1.2pt,
                    minimum width=19pt, minimum height=13pt, font=\sffamily\scriptsize\bfseries},
     ilab/.style={font=\sffamily\footnotesize, text=black!80},
-    idx/.style={font=\sffamily\tiny\bfseries, anchor=east},
+    idx/.style={font=\sffamily\tiny\bfseries, anchor=south, fill=white, inner sep=0.6pt},
+    echi/.style={font=\sffamily\tiny, text=black!65, fill=white, inner sep=0.5pt},
     tagt/.style={font=\sffamily\tiny, text=red!70!black},
     tags/.style={font=\sffamily\tiny, text=green!45!black},
     % ===== 右部：等值面 =====
@@ -52,6 +53,15 @@
 \draw[main edge] (C0) -- (C10);
 \foreach \v in {2, 4, 5, 9} \path (C0) -- (C10) node[pos={(\v-0)/(10-0)}, reg node] {\v};
 
+% ---- 每条边(连通分量)的 Euler 示性数 χ 标注（初值 +1，鞍点后仍为 +1）----
+\path (C0)  -- (C10) node[pos=0.68, echi] {$\chi{=}1$};
+\path (C1)  -- (C15) node[pos=0.88, echi] {$\chi{=}1$};
+\path (C8)  -- (C10) node[pos=0.5,  echi] {$\chi{=}1$};
+\path (C10) -- (C13) node[pos=0.5,  echi] {$\chi{=}1$};
+\path (C10) -- (C15) node[pos=0.5,  echi] {$\chi{=}1$};
+\path (C15) -- (C22) node[pos=0.62, echi] {$\chi{=}1$};
+\path (C15) -- (C24) node[pos=0.62, echi] {$\chi{=}1$};
+
 % 左部标题
 \node[font=\sffamily\bfseries\small, text=black!70, align=center] at (1.0, 25.8)
    {轮廓树\\{\footnotesize\mdseries（临界点 + 普通节点）}};
@@ -62,27 +72,29 @@
 % 这些点把标量轴分成若干区间，每个区间内连通分量数 c 恒定。
 % =========================================================
 
-% ---- 区间色带（背景）：连通分量数按边穿越计数 ----
+% ---- 区间色带（背景）：按连通分量数 c 着色，c 相同用同一颜色 ----
+% c=1 -> blue!12 ；c=2 -> green!14 ；c=3 -> orange!20
 % (0,1):c1  (1,8):c2  (8,10):c3  (10,13):c3  (13,15):c2  (15,22):c2  (22,24):c1
-\fill[blue!8]  (3.78,0)  rectangle (4.78,1);
-\fill[green!8] (3.78,1)  rectangle (4.78,8);
-\fill[blue!8]  (3.78,8)  rectangle (4.78,10);
-\fill[green!8] (3.78,10) rectangle (4.78,13);
-\fill[blue!8]  (3.78,13) rectangle (4.78,15);
-\fill[green!8] (3.78,15) rectangle (4.78,22);
-\fill[blue!8]  (3.78,22) rectangle (4.78,24);
+\fill[blue!12]   (3.78,0)  rectangle (4.78,1);   % I1 c=1
+\fill[green!14]  (3.78,1)  rectangle (4.78,8);   % I2 c=2
+\fill[orange!20] (3.78,8)  rectangle (4.78,10);  % I3 c=3
+\fill[orange!20] (3.78,10) rectangle (4.78,13);  % I4 c=3
+\fill[green!14]  (3.78,13) rectangle (4.78,15);  % I5 c=2
+\fill[green!14]  (3.78,15) rectangle (4.78,22);  % I6 c=2
+\fill[blue!12]   (3.78,22) rectangle (4.78,24);  % I7 c=1
 \draw[black!30, line width=0.5pt] (3.78,0) rectangle (4.78,24);
 \foreach \v in {1,8,10,13,15,22}
    \draw[black!30, line width=0.4pt] (3.78,\v) -- (4.78,\v);
 
-% ---- 区间标注：区间编号 + 连通分量数 c（自下而上 I1..I7）----
-\node[ilab, align=center] at (4.28,0.5)  {$I_1$\\[-1pt]{\scriptsize$c{=}1$}};
-\node[ilab, align=center] at (4.28,4.5)  {$I_2$\\[-1pt]{\scriptsize$c{=}2$}};
-\node[ilab, align=center] at (4.28,9)    {$I_3$\\[-1pt]{\scriptsize$c{=}3$}};
-\node[ilab, align=center] at (4.28,11.5) {$I_4$\\[-1pt]{\scriptsize$c{=}3$}};
-\node[ilab, align=center] at (4.28,14)   {$I_5$\\[-1pt]{\scriptsize$c{=}2$}};
-\node[ilab, align=center] at (4.28,18.5) {$I_6$\\[-1pt]{\scriptsize$c{=}2$}};
-\node[ilab, align=center] at (4.28,23)   {$I_7$\\[-1pt]{\scriptsize$c{=}1$}};
+% ---- 区间标注：区间编号 + 连通分量数 c + 区间总 Euler 示性数 χ（自下而上 I1..I7）----
+% 每条边(分量)χ 初值 +1，区间总 χ = 各边 χ 之和 = c。
+\node[ilab, align=center] at (4.28,0.5)  {$I_1$\\[-1pt]{\scriptsize$c{=}1,\ \chi{=}1$}};
+\node[ilab, align=center] at (4.28,4.5)  {$I_2$\\[-1pt]{\scriptsize$c{=}2,\ \chi{=}2$}};
+\node[ilab, align=center] at (4.28,9)    {$I_3$\\[-1pt]{\scriptsize$c{=}3,\ \chi{=}3$}};
+\node[ilab, align=center] at (4.28,11.5) {$I_4$\\[-1pt]{\scriptsize$c{=}3,\ \chi{=}3$}};
+\node[ilab, align=center] at (4.28,14)   {$I_5$\\[-1pt]{\scriptsize$c{=}2,\ \chi{=}2$}};
+\node[ilab, align=center] at (4.28,18.5) {$I_6$\\[-1pt]{\scriptsize$c{=}2,\ \chi{=}2$}};
+\node[ilab, align=center] at (4.28,23)   {$I_7$\\[-1pt]{\scriptsize$c{=}1,\ \chi{=}1$}};
 
 % ---- 标量轴（线段，与树同高度）----
 \draw[axis, -{Stealth[length=3mm, width=2.4mm]}] (3.6,-0.4) -- (3.6,25.2);
@@ -110,26 +122,15 @@
 \node[mapdot, draw=red!70!black]   at (3.6,22) {22};
 \node[mapdot, draw=red!70!black]   at (3.6,24) {24};
 
-% ---- Morse 指数 i 徽标：i=0 极小值(+1)，i=1/2 鞍点(-1/+1)，i=3 极大值(-1) ----
-% 位于各临界点左侧，标出指数 i 及其对 χ 的贡献 Δχ=(-1)^i。
-\node[idx, text=blue!55!black]  at (3.30,0.9)  {$i{=}0$};
-\node[idx, text=blue!55!black]  at (3.30,1.9)  {$i{=}0$};
-\node[idx, text=blue!55!black]  at (3.30,8.9)  {$i{=}0$};
-\node[idx, text=green!45!black] at (3.30,10.9) {$i{=}1$};
-\node[idx, text=red!70!black]   at (3.30,13.9) {$i{=}3$};
-\node[idx, text=green!45!black] at (3.30,15.9) {$i{=}1$};
-\node[idx, text=red!70!black]   at (3.30,22.9) {$i{=}3$};
-\node[idx, text=red!70!black]   at (3.30,24.9) {$i{=}3$};
 
 % 中部标题
 \node[font=\sffamily\bfseries\small, text=black!70, align=center] at (4.2,26.9)
    {映射 (map)\\{\footnotesize\mdseries 临界点 $\to$ 标量轴分区}};
 
 % =========================================================
-% ===== 中 -> 右：区间/层级 到 代表性等值面 的映射箭头 =====
-% 右侧等值面按标量递增均匀分布到 5 个竖直槽位，避免真实 y 值相邻导致重叠。
-% 槽位分配（按标量顺序）：t1->5, S2->11, t2->17, S1->23, t3->29
+% ===== 中 -> 右：映射箭头（指向已移除的等值面，已一并去除）=====
 % =========================================================
+\iffalse
 \draw[-{Stealth[length=2.4mm, width=2mm]}, line width=0.9pt, draw=blue!55!black]
       (4.85,9)  .. controls (5.3,9)  and (5.3,5)  .. (5.65,5);
 \draw[-{Stealth[length=2.4mm, width=2mm]}, line width=0.9pt, draw=green!45!black]
@@ -146,10 +147,15 @@
 \node[tagt] at (5.02,14.0) {$t_2$};
 \node[tags] at (5.02,15.0) {$S_1$};
 \node[tagt] at (5.02,23.0) {$t_3$};
+\fi
 
 % =========================================================
 % ===== 右部：3D 体数据等值面（连通分量 + 亏格；保持不变）=====
 % =========================================================
+% ===== 右部 3D 等值面内容已移除，仅保留占位区域（位置不变）=====
+% （原 blobA/B/C、mergeiso 及 t1/t2/t3、S1/S2 层级已删除；
+%   保留右侧画布宽度与标量方向箭头以维持整体布局。）
+\iffalse
 % blobA：横向拉长、右侧凸起
 \newcommand{\blobA}[3]{%
   \begin{scope}[shift={(#1,#2)}, scale=#3, x=1cm, y=1cm]
@@ -189,7 +195,7 @@
   \blobB{0.15}{0.5}{0.40}
   \blobC{0.35}{-0.55}{0.45}
   \node[font=\sffamily\footnotesize, text=black!70, align=center] at (-0.2,-1.15)
-     {$c=3,\ g=1$：三个独立分量};
+     {$c=3,\ \chi=6$：三个球面分量};
 \end{scope}
 
 % ---- t2 层级（槽位 y=17）：c=2 ----
@@ -198,7 +204,7 @@
   \blobB{-0.5}{0.05}{0.72}
   \blobA{0.75}{-0.35}{0.5}
   \node[font=\sffamily\footnotesize, text=black!70, align=center] at (0,-1.15)
-     {$c=2,\ g=1$：一分量封顶消失};
+     {$c=2,\ \chi=4$：一分量封顶消失};
 \end{scope}
 
 % ---- t3 层级（槽位 y=29）：c=1 ----
@@ -206,7 +212,7 @@
   \node[font=\sffamily\footnotesize\bfseries, text=red!70!black] at (-1.55,0) {$t_3$};
   \blobC{0}{0}{1.05}
   \node[font=\sffamily\footnotesize, text=black!70, align=center] at (0,-1.15)
-     {$c=1,\ g=1$：仅剩单一分量};
+     {$c=1,\ \chi=2$：仅剩单一分量};
 \end{scope}
 
 % ---- 鞍点合并瞬间的等值面 ----
@@ -243,23 +249,72 @@
 \end{scope}
 
 % ===== 标量方向箭头 =====
-\draw[-{Stealth[length=2.6mm]}, line width=1pt, black!55] (8.3,3.5) -- (8.3,30.5);
-\node[font=\sffamily\small, text=black!60, rotate=-90] at (8.55,17) {标量 $f$ 增大};
-\node[font=\sffamily\footnotesize, text=black!55] at (6.7,31.5) {3D 体数据等值面（不规则轮廓，$g\!=\!1$）};
+\fi
+\draw[-{Stealth[length=2.6mm]}, line width=1pt, black!55] (8.3,0) -- (8.3,24);
+\node[font=\sffamily\small, text=black!60, rotate=-90] at (8.55,12) {标量 $f$ 增大};
+% 顶部占位（维持原画布上边界，避免整体版面收缩）
+\path (6.7,31.5);
+% ---- 右部标题 ----
+\node[font=\sffamily\bfseries\small, text=black!70, align=center] at (6.9,26.9)
+   {真实网格中等值面};
 
 % =========================================================
-% ===== 底部图例与标题 =====
+% ===== 从鞍点 f=10 / f=15 引导线到右侧占位框（等值面图待粘贴）=====
+% 起点取色带右边界，终点连到占位框左边缘。
 % =========================================================
-\node[font=\sffamily\footnotesize] at (1.4,-1.5)
-   {\textcolor{blue!55!black}{$\bullet$}~极小值：分量出生};
-\node[font=\sffamily\footnotesize] at (3.9,-1.5)
-   {\textcolor{green!45!black}{$\bullet$}~鞍点：合并/分裂};
-\node[font=\sffamily\footnotesize] at (6.4,-1.5)
-   {\textcolor{red!70!black}{$\bullet$}~极大值：分量消亡};
+% ---- 鞍点 S1（f=15）-> 上方占位框 ----
+\draw[-{Stealth[length=2.4mm, width=2mm]}, line width=0.9pt, draw=green!45!black]
+      (4.85,15) .. controls (5.4,15) and (5.4,20) .. (5.7,20);
+\node[draw=green!45!black, dashed, line width=0.8pt, fill=green!4,
+      minimum width=3.2cm, minimum height=3.2cm, anchor=south west,
+      font=\sffamily\scriptsize, text=black!45, align=center] at (5.7,17)
+   {鞍点 $S_1$（$f{=}15$）\\[2pt]等值面待粘贴};
 
-\node[font=\sffamily\bfseries\large, align=center] at (4.0,-2.9)
-   {增广轮廓树 $\to$ 临界值分区映射 $\to$ 等值面
-    （左：树；\ 中：映射与区间标注；\ 右：3D 等值面）};
+% ---- 鞍点 S2（f=10）-> 下方占位框 ----
+\draw[-{Stealth[length=2.4mm, width=2mm]}, line width=0.9pt, draw=green!45!black]
+      (4.85,10) .. controls (5.4,10) and (5.4,8) .. (5.7,8);
+\node[draw=green!45!black, dashed, line width=0.8pt, fill=green!4,
+      minimum width=3.2cm, minimum height=3.2cm, anchor=north west,
+      font=\sffamily\scriptsize, text=black!45, align=center] at (5.7,11)
+   {鞍点 $S_2$（$f{=}10$）\\[2pt]等值面待粘贴};
+
+% =========================================================
+% ===== 底部图例、表名与表注（统一放入一个居中节点，避免坐标缩放导致堆叠）=====
+% =========================================================
+\node[anchor=north, align=center] at (3.7,-1.2) {%
+  \begin{minipage}{15cm}
+    \centering
+    % ---- 图例 ----
+    {\sffamily\footnotesize
+      \textcolor{blue!55!black}{$\bullet$}~极小值：分量出生\hspace{2.2em}
+      \textcolor{green!45!black}{$\bullet$}~鞍点：合并/分裂\hspace{2.2em}
+      \textcolor{red!70!black}{$\bullet$}~极大值：分量消亡\par}
+    \vspace{6pt}
+    % ---- 区间色带颜色图例（按连通分量数 c）----
+    {\sffamily\footnotesize
+      区间颜色（按连通分量数 $c$）：\hspace{0.6em}
+      \tikz[baseline=-0.5ex]\fill[blue!12]   (0,0) rectangle (0.42,0.26);~$c{=}1$\hspace{1.8em}
+      \tikz[baseline=-0.5ex]\fill[green!14]  (0,0) rectangle (0.42,0.26);~$c{=}2$\hspace{1.8em}
+      \tikz[baseline=-0.5ex]\fill[orange!20] (0,0) rectangle (0.42,0.26);~$c{=}3$\par}
+    \vspace{10pt}
+    % ---- 表名 ----
+    {\sffamily\bfseries\normalsize 图 1\quad 增广轮廓树 $\to$ 临界值分区映射\par}
+    \vspace{3pt}
+    {\sffamily\footnotesize\color{black!60}（左：轮廓树；\ 中：临界点到标量轴的映射与区间标注；\ 右：在鞍点 $f{=}10,15$ 处提取的真实网格等值面，展示分量合并瞬间）\par}
+    \vspace{10pt}
+    % ---- 符号含义说明（表注）----
+    {\sffamily\scriptsize\color{black!80}
+      \renewcommand{\arraystretch}{1.3}%
+      \begin{tabular}{@{}r@{~}l@{\hspace{2.4em}}r@{~}l@{}}
+        $f$        & 标量场（等值函数），沿箭头方向递增   &
+        $c$        & 区间内等值面的连通分量数 \\
+        $\chi$     & 边 / 区间等值面的 Euler 示性数     &
+        $I_k$      & 临界值划分出的第 $k$ 个标量区间 \\
+        $S_1,S_2$  & 鞍点（分量合并 / 分裂事件）       &
+        $f{=}10,15$ & 右侧真实等值面的提取标量值 \\
+      \end{tabular}\par}
+  \end{minipage}%
+};
 
 \end{tikzpicture}
 \end{document}
