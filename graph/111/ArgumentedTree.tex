@@ -1,45 +1,198 @@
 \documentclass[tikz,border=20pt]{standalone}
-\usetikzlibrary{calc}
+\usetikzlibrary{calc, arrows.meta, shadings, shapes.geometric}
+\usepackage[UTF8]{ctex}
 
 \begin{document}
 \begin{tikzpicture}[
-    y=0.7cm, x=2.5cm,
-    crit node/.style={circle, draw=black, fill=gray!20, thick, inner sep=1pt, minimum size=16pt, font=\sffamily\footnotesize},
-    reg node/.style={circle, draw=black, fill=white, inner sep=0.5pt, minimum size=12pt, font=\sffamily\tiny},
-    main edge/.style={very thick, draw=black}
+    y=0.5cm, x=2.6cm,
+    crit node/.style={circle, draw=black, fill=gray!20, thick, inner sep=1pt, minimum size=20pt, font=\sffamily\footnotesize},
+    min node/.style={circle, draw=black, fill=gray!55, thick, inner sep=1pt, minimum size=20pt, font=\sffamily\footnotesize},
+    reg node/.style={circle, draw=black, fill=white, inner sep=0.5pt, minimum size=13pt, font=\sffamily\tiny},
+    main edge/.style={ultra thick},
+    axis/.style={line width=1.6pt, draw=black!85},
+    proj/.style={draw=black!35, dashed, line width=0.7pt, -{Stealth[length=2mm, width=1.6mm]}},
+    mapdot/.style={ellipse, fill=black!75, text=white, line width=1pt, inner sep=1.2pt,
+                   minimum width=22pt, minimum height=14pt, font=\sffamily\scriptsize\bfseries},
+    ilab/.style={font=\sffamily\footnotesize, text=black!80},
+    echi/.style={font=\sffamily\tiny, text=black!65, fill=white, inner sep=0.5pt},
+    lab/.style={font=\sffamily\small, text=black!75},
 ]
 
-% 关键点 (所有极值与鞍点)
-\node[crit node] (C24) at (0, 24) {24};
-\node[crit node] (C22) at (1, 22) {22};
-\node[crit node] (C15) at (0.5, 15) {15};
-\node[crit node] (C13) at (2, 13) {13};
-\node[crit node] (C10) at (1, 10) {10};
-\node[crit node] (C8)  at (2, 8) {8};
-\node[crit node] (C1)  at (0, 1) {1};
-\node[crit node] (C0)  at (0.5, 0) {0};
+% =========================================================
+% ===== 左部：增广轮廓树 =====
+% =========================================================
+\node[crit node] (C100) at ( 0.9, 100) {100};
+\node[crit node] (C90) at ( 2.2, 90) {90};
+\node[crit node] (C81) at ( 1.8, 81) {81};
+\node[crit node] (C80) at (-0.3, 80) {80};
+\node[crit node] (C71) at ( 2.8, 71) {71};
+\node[crit node] (C50) at ( 1.0, 50) {50};
+\node[crit node] (C30) at ( 1.0, 30) {30};
+\node[crit node] (C20) at ( 0.0, 20) {20};
+\node[min  node] (C0)  at ( 1.2,  0) {0};
 
-% 连线与普通节点填充
-\draw[main edge] (C15) -- (C24);
-\foreach \v in {17, 18, 20, 23} \path (C15) -- (C24) node[pos={(\v-15)/(24-15)}, reg node] {\v};
+% ---- 主干连线（拓扑树，统一黑色）----
+\draw[main edge, black] (C50) -- (C100);
+\draw[main edge, black] (C50) -- (C80);
+\draw[main edge, black] (C50) -- (C81);
+\draw[main edge, black] (C81) -- (C90);
+\draw[main edge, black] (C81) -- (C71);
+\draw[main edge, black] (C30) -- (C50);
+\draw[main edge, black] (C20) -- (C30);
+\draw[main edge, black] (C0)  -- (C30);
 
-\draw[main edge] (C15) -- (C22);
-\foreach \v in {16, 19, 21} \path (C15) -- (C22) node[pos={(\v-15)/(22-15)}, reg node] {\v};
+% ---- 普通节点填充（沿各分支等值插值）----
+\foreach \v in {5,6,7,8,9,10,11,12,13,14,15,16,17,18,19}
+    \path (C0) -- (C30) node[pos={(\v-0)/(30-0)}, reg node] {\v};
+\foreach \v in {21}
+    \path (C20) -- (C30) node[pos={(\v-20)/(30-20)}, reg node] {\v};
+\foreach \v in {31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49}
+    \path (C30) -- (C50) node[pos={(\v-30)/(50-30)}, reg node] {\v};
+\foreach \v in {75,76,77,78,79}
+    \path (C50) -- (C80) node[pos={(\v-50)/(80-50)}, reg node] {\v};
+\foreach \v in {67,68,69,70,72,73,74}
+    \path (C50) -- (C81) node[pos={(\v-50)/(81-50)}, reg node] {\v};
+\foreach \v in {82,83,84,85,86,87,88,89}
+    \path (C81) -- (C90) node[pos={(\v-81)/(90-81)}, reg node] {\v};
 
-\draw[main edge] (C1) -- (C15);
-\foreach \v in {3, 6, 7, 14} \path (C1) -- (C15) node[pos={(\v-1)/(15-1)}, reg node] {\v};
+% ---- 每条边(连通分量)的 Euler 示性数 χ 标注（每分量 χ=1）----
+\path (C0)  -- (C30) node[pos=0.5,  echi, xshift=13pt] {$\chi{=}1$};
+\path (C20) -- (C30) node[pos=0.55, echi, xshift=-13pt] {$\chi{=}1$};
+\path (C30) -- (C50) node[pos=0.5,  echi, xshift=14pt] {$\chi{=}1$};
+\path (C50) -- (C80) node[pos=0.55, echi, xshift=-13pt] {$\chi{=}1$};
+\path (C50) -- (C90) node[pos=0.72, echi, xshift=14pt] {$\chi{=}1$};
+\path (C50) -- (C100) node[pos=0.55, echi, xshift=-13pt] {$\chi{=}1$};
+\path (C81) -- (C71) node[pos=0.5, echi, xshift=13pt] {$\chi{=}1$};
 
-\draw[main edge] (C10) -- (C15);
-\foreach \v in {11, 12} \path (C10) -- (C15) node[pos={(\v-10)/(15-10)}, reg node] {\v};
+% ---- 左部标题 ----
+\node[font=\sffamily\bfseries\small, text=black!70, align=center] at (1.0, 107)
+   {轮廓树\\{\footnotesize\mdseries（临界点 + 普通节点）}};
 
-\draw[main edge] (C10) -- (C13); 
+% =========================================================
+% ===== 中部：映射（临界点 -> 标量轴分区）=====
+% (0,20):c1 (20,30):c2 (30,50):c1 (50,71):c3 (71,80):c4 (80,81):c3 (81,90):c2 (90,100):c1
+% =========================================================
+% ---- 区间色带（背景）：按连通分量数 c 着色 ----
+\fill[blue!12]   (3.78,0)  rectangle (4.78,20);   % I1 c=1
+\fill[green!14]  (3.78,20) rectangle (4.78,30);   % I2 c=2
+\fill[blue!12]   (3.78,30) rectangle (4.78,50);   % I3 c=1
+\fill[orange!20] (3.78,50) rectangle (4.78,71);   % I4 c=3
+\fill[violet!22] (3.78,71) rectangle (4.78,80);   % I5 c=4
+\fill[orange!20] (3.78,80) rectangle (4.78,81);   % I6 c=3
+\fill[green!14]  (3.78,81) rectangle (4.78,90);   % I7 c=2
+\fill[blue!12]   (3.78,90) rectangle (4.78,100);  % I8 c=1
+\draw[black!30, line width=0.5pt] (3.78,0) rectangle (4.78,100);
+\foreach \v in {20,30,50,71,80,81,90}
+   \draw[black!30, line width=0.4pt] (3.78,\v) -- (4.78,\v);
 
-\draw[main edge] (C8) -- (C10); 
+% ---- 区间标注：区间编号 + 亏格 g ----
+\node[ilab, align=center] at (4.28,10)   {$I_1$\\[-1pt]{\scriptsize$g{=}g_1$}};
+\node[ilab, align=center] at (4.28,25)   {$I_2$\\[-1pt]{\scriptsize$g{=}g_1{+}1$}};
+\node[ilab, align=center] at (4.28,40)   {$I_3$\\[-1pt]{\scriptsize$g{=}g_1$}};
+\node[ilab, align=center] at (4.28,60.5) {$I_4$\\[-1pt]{\scriptsize$g{=}g_1{+}2$}};
+\node[ilab, align=center] at (4.28,75.5) {$I_5$\\[-1pt]{\scriptsize$g{=}g_1{+}3$}};
+\node[ilab, align=center] at (4.28,85.5) {$I_7$\\[-1pt]{\scriptsize$g{=}g_1{+}1$}};
+\node[ilab, align=center] at (4.28,95)   {$I_8$\\[-1pt]{\scriptsize$g{=}g_1$}};
+% (80,81) 区间过窄，标注移至右侧并用引线指向
+\draw[black!45, line width=0.4pt] (4.78,80.5) -- (5.15,80.5);
+\node[ilab, align=left, anchor=west] at (5.15,80.5)
+   {$I_6$~{\scriptsize$g{=}g_1{+}2$}};
 
-\draw[main edge] (C0) -- (C10);
-\foreach \v in {2, 4, 5, 9} \path (C0) -- (C10) node[pos={(\v-0)/(10-0)}, reg node] {\v};
+% ---- 标量轴 ----
+\draw[axis, -{Stealth[length=3mm, width=2.4mm]}] (3.6,-2) -- (3.6,104);
+\node[font=\sffamily\small\itshape, text=black!70] at (3.6,106) {$f$};
 
-\node[font=\sffamily\bfseries\large] at (1, -2.2) {Argumented Tree};
+% ---- 投影：每个临界点 -> 轴上一点 ----
+\draw[proj] (C100) -- (3.47,100);
+\draw[proj] (C90) -- (3.47,90);
+\draw[proj] (C81) -- (3.47,81);
+\draw[proj] (C80) -- (3.47,80);
+\draw[proj] (C71) -- (3.47,71);
+\draw[proj] (C50) -- (3.47,50);
+\draw[proj] (C30) -- (3.47,30);
+\draw[proj] (C20) -- (3.47,20);
+\draw[proj] (C0)  -- (3.47,0);
+
+% ---- 轴上临界点标记（极小值蓝、鞍点绿、极大值红）----
+% 极小值蓝(0,20,71)、鞍点绿(30,50,81)、极大值红(80,90,100)
+\node[mapdot, draw=blue!55!black]  at (3.6,0)   {0};
+\node[mapdot, draw=blue!55!black]  at (3.6,20)  {20};
+\node[mapdot, draw=green!45!black] at (3.6,30)  {30};
+\node[mapdot, draw=green!45!black] at (3.6,50)  {50};
+\node[mapdot, draw=blue!55!black]  at (3.6,71)  {71};
+\node[mapdot, draw=red!70!black]   at (3.6,80)  {80};
+\node[mapdot, draw=green!45!black, minimum height=12pt] at (3.94,81) {81};
+\node[mapdot, draw=red!70!black]   at (3.6,90)  {90};
+\node[mapdot, draw=red!70!black]   at (3.6,100) {100};
+
+% ---- 中部标题 ----
+\node[font=\sffamily\bfseries\small, text=black!70, align=center] at (4.2,111)
+   {映射 (map)\\{\footnotesize\mdseries 临界点 $\to$ 标量轴分区}};
+
+% =========================================================
+% ===== 右部：真实网格中等值面（占位框，待粘贴）=====
+% =========================================================
+\draw[-{Stealth[length=2.6mm]}, line width=1pt, black!55] (8.3,0) -- (8.3,100);
+\node[font=\sffamily\small, text=black!60, rotate=-90] at (8.55,50) {标量 $f$ 增大};
+\node[font=\sffamily\bfseries\small, text=black!70, align=center] at (6.9,111)
+   {真实网格中等值面};
+
+% ---- 鞍点 S1（f=81）-> 上方占位框 ----
+\draw[-{Stealth[length=2.4mm, width=2mm]}, line width=0.9pt, draw=green!45!black]
+      (4.85,81) .. controls (5.4,81) and (5.6,81) .. (5.85,81);
+\node[draw=green!45!black, dashed, line width=0.8pt, fill=green!4,
+      minimum width=3.2cm, minimum height=3.2cm, anchor=west,
+      font=\sffamily\scriptsize, text=black!45, align=center] at (5.85,81)
+   {鞍点 $S_1$（$f{=}81$）\\[2pt]等值面待粘贴};
+
+% ---- 鞍点 S2（f=30）-> 下方占位框 ----
+\draw[-{Stealth[length=2.4mm, width=2mm]}, line width=0.9pt, draw=green!45!black]
+      (4.85,30) .. controls (5.4,30) and (5.6,30) .. (5.85,30);
+\node[draw=green!45!black, dashed, line width=0.8pt, fill=green!4,
+      minimum width=3.2cm, minimum height=3.2cm, anchor=west,
+      font=\sffamily\scriptsize, text=black!45, align=center] at (5.85,30)
+   {鞍点 $S_2$（$f{=}30$）\\[2pt]等值面待粘贴};
+
+% =========================================================
+% ===== 底部图例、表名与表注 =====
+% =========================================================
+\node[anchor=north, align=center] at (3.7,-5) {%
+  \begin{minipage}{15cm}
+    \centering
+    {\sffamily\footnotesize
+      \textcolor{blue!55!black}{$\bullet$}~极小值：分量出生\hspace{2.2em}
+      \textcolor{green!45!black}{$\bullet$}~鞍点：合并/分裂\hspace{2.2em}
+      \textcolor{red!70!black}{$\bullet$}~极大值：分量消亡\par}
+    \vspace{6pt}
+    {\sffamily\footnotesize
+      区间颜色（按连通分量数 $c$）：\hspace{0.6em}
+      \tikz[baseline=-0.5ex]\fill[blue!12]   (0,0) rectangle (0.42,0.26);~$c{=}1$\hspace{1.8em}
+      \tikz[baseline=-0.5ex]\fill[green!14]  (0,0) rectangle (0.42,0.26);~$c{=}2$\hspace{1.8em}
+      \tikz[baseline=-0.5ex]\fill[orange!20] (0,0) rectangle (0.42,0.26);~$c{=}3$\hspace{1.8em}
+      \tikz[baseline=-0.5ex]\fill[violet!22] (0,0) rectangle (0.42,0.26);~$c{=}4$\par}
+    \vspace{10pt}
+    {\sffamily\bfseries\normalsize 图 1\quad 增广轮廓树 $\to$ 临界值分区映射\par}
+    \vspace{3pt}
+    {\sffamily\footnotesize\color{black!60}（左：轮廓树；\ 中：临界点到标量轴的映射与区间标注；\ 右：在鞍点 $f{=}30,81$ 处提取的真实网格等值面，展示分量合并瞬间）\par}
+    \vspace{10pt}
+    {\sffamily\scriptsize\color{black!80}
+      \renewcommand{\arraystretch}{1.3}%
+      \begin{tabular}{@{}r@{~}l@{\hspace{2.4em}}r@{~}l@{}}
+        $f$        & 标量场（等值函数），沿箭头方向递增   &
+        $c$        & 区间内等值面的连通分量数 \\
+        $\chi$     & 边 / 区间等值面的 Euler 示性数     &
+        $I_k$      & 临界值划分出的第 $k$ 个标量区间 \\
+        $g$        & 亏格，$g=c-\chi/2$（$\chi$ 为每条边取常数） & & \\
+      \end{tabular}\par}
+    \vspace{3pt}
+    {\sffamily\scriptsize\color{black!60}
+      设初始区间 $I_1$ 亏格为 $g_1$，则各区间 $g=g_1+(c-1)$。\par}
+  \end{minipage}%
+};
 
 \end{tikzpicture}
 \end{document}
+
+
+
+
