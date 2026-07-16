@@ -50,16 +50,16 @@
 
 \section{相关研究与研究动机}
 
-本节按“背景—相关研究—研究动机”的顺序展开：\ref{sec:background} 节给出等值面、轮廓树及其亏格、欧拉示性数与连通性的学术化背景；\ref{sec:related} 节梳理已有的拓扑与几何两类工作；\ref{sec:motivation} 节从“选择代表性等值面”出发引出本文方法。
+本节按”背景—研究动机—相关研究”的顺序展开：\ref{sec:background} 节给出等值面、轮廓树及其亏格、欧拉示性数与连通性的学术化背景；\ref{sec:motivation} 节从”选择代表性等值面”出发引出本文方法；\ref{sec:related} 节梳理已有的拓扑与几何两类工作。
 
 \subsection{背景}
 \label{sec:background}
 
-\paragraph{等值面。}科学计算、医学影像和流体模拟中的数据常表示为定义在空间域上的标量场 $f:\Omega\rightarrow\mathbb{R}$。给定标量阈值 $\alpha$，其等值面（isosurface）定义为原像 $f^{-1}(\alpha)=\{x\in\Omega\mid f(x)=\alpha\}$，在三维标量场中一般是一张或多张独立的封闭曲面。Marching Cubes 等方法可在规则网格上把 $f^{-1}(\alpha)$ 显式重建为三角网格（triangle mesh），是流场可视化分析中刻画结构的基本工具。\cite{lorensen_cline_1987} 然而逐阈值抽取只能给出孤立层级的几何，难以揭示等值面随阈值连续变化时的全局层次结构。
+\paragraph{等值面}科学计算、医学影像和流体模拟中的数据常表示为定义在空间域上的标量场 $f:\Omega\rightarrow\mathbb{R}$。给定标量阈值 $\alpha$，其等值面（isosurface）定义为原像 $f^{-1}(\alpha)=\{x\in\Omega\mid f(x)=\alpha\}$，在三维标量场中一般是一张或多张独立的封闭曲面。Marching Cubes 等方法可在规则网格上把 $f^{-1}(\alpha)$ 显式重建为三角网格（triangle mesh），是流场可视化分析中刻画结构的基本工具。\cite{lorensen_cline_1987} 然而逐阈值抽取只能给出孤立层级的几何，难以揭示等值面随阈值连续变化时的全局层次结构。
 
-\paragraph{轮廓树。}拓扑数据分析为此提供了更紧凑的表示。轮廓树（contour tree）通过刻画等值面连通分量随阈值变化的演化，把连续阈值空间压缩为一棵树：它记录等值面 $f^{-1}(\alpha)$ 的连通分量随阈值 $\alpha$ 变化而出生、合并、分裂与消亡的过程。\cite{van_kreveld_1997,carr_contour_2003} 形式上，它可由记录子水平集 $F_\alpha=\{x\in\Omega\mid f(x)\leq\alpha\}$ 连通分量演化的并树（join tree）与记录超水平集演化的分裂树（split tree）合并得到。极值点、鞍点和分支节点对应关键拓扑事件，树边则表示相邻事件之间的演化区间。Topology ToolKit（TTK）等工具已将这些结构封装为可与 ParaView、VTK 衔接的工程模块，为轮廓树的计算与增广提供了标准实现。\cite{tierny_ttk_2018}
+\paragraph{轮廓树}拓扑数据分析为此提供了更紧凑的表示。轮廓树（contour tree）通过刻画等值面连通分量随阈值变化的演化，把连续阈值空间压缩为一棵树：它记录等值面 $f^{-1}(\alpha)$ 的连通分量随阈值 $\alpha$ 变化而出生、合并、分裂与消亡的过程。\cite{van_kreveld_1997,carr_contour_2003} 形式上，它可由记录子水平集 $F_\alpha=\{x\in\Omega\mid f(x)\leq\alpha\}$ 连通分量演化的并树（join tree）与记录超水平集演化的分裂树（split tree）合并得到。极值点、鞍点和分支节点对应关键拓扑事件，树边则表示相邻事件之间的演化区间。Topology ToolKit（TTK）等工具已将这些结构封装为可与 ParaView、VTK 衔接的工程模块，为轮廓树的计算与增广提供了标准实现。\cite{tierny_ttk_2018}
 
-\paragraph{等值面的亏格与欧拉示性数。}等值面的亏格（genus）$g$ 在拓扑学上的直观含义是一张闭合、可定向曲面上所含“把手”（handles）或“孔洞”（holes）的数量，是刻画其复杂程度的核心拓扑不变量：$g=0$ 对应球面，$g=1$ 对应环面（如甜甜圈或带一个把手的杯子），$g=2$ 对应双环面，$g=n$ 则对应带 $n$ 个相互独立把手的曲面。亏格亦可由 Betti 数刻画——对一张连通闭合可定向曲面，$0$ 维 Betti 数 $\beta_0=1$ 计连通分量、$1$ 维 Betti 数满足 $\beta_1=2g$、$2$ 维 Betti 数 $\beta_2=1$——从而把“把手数”与曲面上独立环路的数量联系起来。\cite{edelsbrunner_harer_2010} 对由 Marching Cubes 抽取的三角网格，亏格通过网格的点、边、面数量联合定义。对一个连通且闭合的等值面网格，其欧拉示性数（Euler characteristic）为
+\paragraph{等值面的亏格与欧拉示性数}等值面的亏格（genus）$g$ 在拓扑学上的直观含义是一张闭合、可定向曲面上所含“把手”（handles）或“孔洞”（holes）的数量，是刻画其复杂程度的核心拓扑不变量：$g=0$ 对应球面，$g=1$ 对应环面（如甜甜圈或带一个把手的杯子），$g=2$ 对应双环面，$g=n$ 则对应带 $n$ 个相互独立把手的曲面。亏格亦可由 Betti 数刻画——对一张连通闭合可定向曲面，$0$ 维 Betti 数 $\beta_0=1$ 计连通分量、$1$ 维 Betti 数满足 $\beta_1=2g$、$2$ 维 Betti 数 $\beta_2=1$——从而把“把手数”与曲面上独立环路的数量联系起来。\cite{edelsbrunner_harer_2010} 对由 Marching Cubes 抽取的三角网格，亏格通过网格的点、边、面数量联合定义。对一个连通且闭合的等值面网格，其欧拉示性数（Euler characteristic）为
 \begin{equation}
 \chi = V - E + F,
 \label{eq:euler}
@@ -71,7 +71,7 @@
 \end{equation}
 若同一阈值下抽取出 $c$ 个彼此不相连的独立封闭曲面（各自亏格之和为 $g$），则关系修正为 $\chi=2c-2g$，即 $g=(2c-\chi)/2$。因此，只要能沿阈值追踪 $\chi$ 的变化，就能反推等值面的亏格演化。
 
-\paragraph{轮廓树与等值面亏格的关系。}轮廓树本身无法完全表达等值面的亏格——它记录连通分量的演化，却不直接给出每张曲面上“把手”的数量，两个亏格截然不同的等值面在轮廓树上可能共享完全相同的边。\cite{carr_flexible_2010} 但亏格的变化严格遵循 Morse 理论：\cite{milnor_morse_1963,edelsbrunner_harer_2010} 只有当阈值 $h$ 穿过轮廓树的节点（临界点）时等值面的拓扑才会跳变，且每个临界点对欧拉示性数的贡献由其 Morse 指数 $i$ 决定——指数 $i$ 的临界点使 $\chi$ 改变 $(-1)^i$。在三维标量场中，$i=0$（极小值）与 $i=3$（极大值）对应等值面连通分量的出生与消亡，$i=1$ 与 $i=2$ 的鞍点则对应亏格的改变：当等值面在两处相交、在中间形成一条通道（环）时亏格加一，对应一阶鞍点（$1$-saddle）；当通道闭合时亏格减一，对应二阶鞍点（$2$-saddle）。据此，已有工作可在轮廓树的极小值边上初始化 $\chi$，沿阈值扫掠在每个节点按其类型累加贡献，从而在保留树结构的同时把亏格信息补全到树的每条边上；实际数据中常出现的多重（非 Morse）鞍点需先经虚拟扰动拆解为标准一阶、二阶鞍点组合，才能保证贡献累加正确。\cite{van_kreveld_1997,carr_contour_2003,ni_fair_2004} 本文不显式计算亏格，仅将上述关系作为说明等值面代表性、并论证“树边内部拓扑不变”的理论背景。
+\paragraph{轮廓树与等值面亏格的关系}轮廓树本身无法完全表达等值面的亏格——它记录连通分量的演化，却不直接给出每张曲面上“把手”的数量，两个亏格截然不同的等值面在轮廓树上可能共享完全相同的边。\cite{carr_flexible_2010} 但亏格的变化严格遵循 Morse 理论：\cite{milnor_morse_1963,edelsbrunner_harer_2010} 只有当阈值 $h$ 穿过轮廓树的节点（临界点）时等值面的拓扑才会跳变，且每个临界点对欧拉示性数的贡献由其 Morse 指数 $i$ 决定——指数 $i$ 的临界点使 $\chi$ 改变 $(-1)^i$。在三维标量场中，$i=0$（极小值）与 $i=3$（极大值）对应等值面连通分量的出生与消亡，$i=1$ 与 $i=2$ 的鞍点则对应亏格的改变：当等值面在两处相交、在中间形成一条通道（环）时亏格加一，对应一阶鞍点（$1$-saddle）；当通道闭合时亏格减一，对应二阶鞍点（$2$-saddle）。据此，已有工作可在轮廓树的极小值边上初始化 $\chi$，沿阈值扫掠在每个节点按其类型累加贡献，从而在保留树结构的同时把亏格信息补全到树的每条边上；实际数据中常出现的多重（非 Morse）鞍点需先经虚拟扰动拆解为标准一阶、二阶鞍点组合，才能保证贡献累加正确。\cite{van_kreveld_1997,carr_contour_2003,ni_fair_2004} 本文不显式计算亏格，仅将上述关系作为说明等值面代表性、并论证“树边内部拓扑不变”的理论背景。
 
 \begin{table}[h]
 \centering
@@ -90,50 +90,39 @@
 \end{tabular}
 \end{table}
 
-\paragraph{轮廓树与等值面连通性的关系。}若说亏格描述单张曲面的复杂程度，连通性则描述等值面在阈值扫掠中的整体演变，而轮廓树正是这一演变的“家谱”：它追踪并记录等值面在不同阈值下的连通分量如何诞生、合并、分裂与消失。轮廓树的节点恰是连通性发生改变的临界时刻——阈值经过极小值点时诞生一个新的连通分量，经过极大值点时一个连通分量收缩为点而消失；鞍点则是连通分量重组之处：一个分量被“扯断”为两个（分裂），或两个原本独立的分量“黏连”为一个（合并）。这一背景表明，等值面的连通性与亏格变化都被编码在轮廓树的结构节点（极值点与鞍点）上，而树边内部则是拓扑不变的演化区间。
-
-\subsection{相关研究}
-\label{sec:related}
-
-围绕等值面表示与轮廓树简化的已有工作大致可沿两条主线梳理：以拓扑事件为对象的拓扑驱动方法，以及以几何量衡量结构差异的几何驱动方法。二者分别对应等值面代表性的不同侧面——前者关注连通性与亏格变化所标记的拓扑结构，后者关注等值面的形状、规模与位置，但都难以在同一框架内同时覆盖位置分布、连通性与亏格、几何特征这三个方面。
-
-拓扑驱动的方法以删除不重要的拓扑特征为目标。基于持久性的简化把短寿命的临界点配对视为噪声消去，衍生出持久性阈值、分支重要性和分支分解（branch decomposition）等多尺度方法，其操作对象是拓扑事件本身——通过消去持久性低的极值—鞍点对来抹平小特征，进而得到不同尺度下的层次结构。\cite{edelsbrunner_persistence_2002,carr_geometric_2004,li_distributed_2024} 其中与本文最相关的是 Carr 等的柔性等值面（flexible isosurface）框架：\cite{carr_flexible_2010} 它以轮廓树作为可交互索引，\cite{carr_contour_2003} 借助路径种子（path seed）从同一阈值的多个分量中精确提取单个等值连通分量，延续了等值面遍历中种子集合的思想。\cite{van_kreveld_1997} 其简化由两类操作完成——叶子剪枝（leaf pruning）删除小拓扑特征并把对应区域压平到鞍点值，实质改变标量场拓扑；顶点归约（vertex reduction）则仅依据连通性折叠不再改变连通性的中间节点。这类方法擅长去噪，却存在两难：叶子剪枝会改删拓扑，破坏本文所要求的连通性与亏格变化点；顶点归约虽保拓扑，但其判据纯粹是连通性，一旦套用到增广轮廓树，整条拓扑链上的普通节点都会被无差别折叠成一条超弧，链内记录的等值面几何演化随之全部丢失。换言之，拓扑驱动方法缺少一个在保留拓扑结构的前提下、按几何代表性筛选链内普通节点的判据。
-
-几何驱动的方法用几何量而非纯拓扑事件来衡量结构的重要性或差异。柔性等值面框架本身已引入局部几何度量（local geometric measure），以等值面面积、区域体积及兼顾空间规模与函数值偏离的超体积（hypervolume）作为剪枝代价，并指出超体积比纯持久性或纯体积更适合交互探索。\cite{carr_geometric_2004,carr_flexible_2010} 但这类度量是赋予单个特征的标量重要性、用于剪枝排序，并不直接回答“相邻两个中间状态是否足够不同”这一成对（pairwise）比较问题。更直接的成对思路是度量等值面相似性：Bruckner 和 Möller 的等值面相似性图（Isosurface Similarity Map, ISM）用归一化互信息（NMI）比较不同阈值等值面的距离场结构，从相似度矩阵中选出代表性等值面，说明拓扑不变时几何仍可能显著改变。\cite{bruckner_ism_2010} 然而这类方法把一个标量层级上的等值结构编码为单一距离场：一方面，多个连通分支的变化会被混合到同一描述符中；另一方面，若在全局阈值下抽取还可能引入属于其他分支的无关结构；更根本地，距离场是对几何分布的连续刻画，并不显式保留等值面在原始离散网格上截穿了哪些边——而后者恰好提供了一种更贴近底层数据、且天然带连通关系的局部结构描述。
-
-此外，图表示学习为局部结构提供了另一种刻画：图卷积网络（GCN）以对称归一化邻域聚合把节点特征编码为低维向量，\cite{kipf_gcn_2017} GraphSAGE 通过邻域采样与聚合实现归纳式表示，\cite{hamilton_graphsage_2017} GIN 则从理论上刻画了消息传递网络区分图结构的判别能力。\cite{xu_gin_2019} 这为把局部等值结构编码成向量、再在向量空间比较相似性提供了工具。与之相关的还有轮廓树/合并树之间的比较工作——结构平均、Wasserstein 距离与重心、分支分解无关的编辑距离，以及强调细粒度局部比较和几何感知对应的方法。\cite{yan_average_2020,pont_wasserstein_2022,wetzels_branch_2022,sridharamurthy_local_2023,yan_geometry_2023} 这些方法提示局部结构比较应结合局部拓扑位置与局部几何，但其目标是度量两棵树之间的整体差异，而非在同一棵树内部沿拓扑链筛选冗余节点。综观这两类工作可见，等值面代表性的三个方面——位置与分布、连通性与亏格变化、几何特征——分别被拓扑方法与几何方法部分覆盖，尚无方法能同时兼顾三者，这一空缺正是本文工作的出发点。
+\paragraph{轮廓树与等值面连通性的关系}若说亏格描述单张曲面的复杂程度，连通性则描述等值面在阈值扫掠中的整体演变，而轮廓树正是这一演变的“家谱”：它追踪并记录等值面在不同阈值下的连通分量如何诞生、合并、分裂与消失。轮廓树的节点恰是连通性发生改变的临界时刻——阈值经过极小值点时诞生一个新的连通分量，经过极大值点时一个连通分量收缩为点而消失；鞍点则是连通分量重组之处：一个分量被“扯断”为两个（分裂），或两个原本独立的分量“黏连”为一个（合并）。这一背景表明，等值面的连通性与亏格变化都被编码在轮廓树的结构节点（极值点与鞍点）上，而树边内部则是拓扑不变的演化区间。
 
 \subsection{研究动机}
 \label{sec:motivation}
 
-等值面是流场可视化分析中的重要工具，选择有代表性的等值面对于刻画流场特征具有重要意义。一张等值面是否具有代表性，可从三个方面衡量。其一是等值面的位置与分布：代表性的等值面应覆盖标量场中不同的空间区域与阈值层级，避免集中于单一区间而遗漏其他特征区域。其二是等值面的连通性以及亏格变化：如 \ref{sec:background} 节所述，连通分量的出生、合并、分裂、消亡以及亏格的增减都被编码在轮廓树的极值点与鞍点上，代表性的等值面序列应完整覆盖这些拓扑事件。其三是等值面的几何特征：即便拓扑不变，等值面的形状、规模与截穿的局部结构仍可能明显演化，代表性应捕捉这类几何差异。前两个方面主要与拓扑分析和简化相关，其代表工作是轮廓树、合并树以及 Carr 等的柔性等值面框架；\cite{carr_contour_2003,carr_flexible_2010,gueunet_act_2019} 第三个方面主要与 ISM 等几何方法相关。\cite{bruckner_ism_2010} 然而如 \ref{sec:related} 节所述，拓扑方法能保住连通性与亏格变化点却难以刻画链内几何演化，几何方法能度量形状差异却常脱离轮廓树分支、混合多分支变化，现有研究因而并不能真正选出有代表性的等值面，也没有方法同时针对上述三个方面。
+等值面是流场可视化分析中的重要工具，选择有代表性的等值面对于刻画流场特征具有重要意义。一张等值面是否具有代表性，可从三个方面衡量。其一是等值面的位置与分布：代表性的等值面应覆盖标量场中不同的空间区域与阈值层级，避免集中于单一区间而遗漏其他特征区域。其二是等值面的连通性以及亏格变化：如 \ref{sec:background} 节所述，连通分量的出生、合并、分裂、消亡以及亏格的增减都被编码在轮廓树的极值点与鞍点上，代表性的等值面序列应完整覆盖这些拓扑事件。其三是等值面的几何特征：即便拓扑不变，等值面的形状、规模与截穿的局部结构仍可能明显演化，代表性应捕捉这类几何差异。前两个方面主要与拓扑分析和简化相关，其代表工作是轮廓树、合并树以及 Carr 等的柔性等值面框架；\cite{carr_contour_2003,carr_flexible_2010,gueunet_act_2019} 第三个方面主要与 ISM 等几何方法相关。\cite{bruckner_ism_2010} 然而如 \ref{sec:related} 节所述，拓扑方法能保住连通性与亏格变化点却难以刻画分支内几何演化，几何方法能度量形状差异却常脱离轮廓树分支、混合多分支变化，现有研究因而并不能真正选出有代表性的等值面，也没有方法同时针对上述三个方面。
 
-本文正是为弥合这一空缺而提出。我们把“选择代表性等值面”具体化为增广轮廓树上的节点筛选问题：为在连续阈值上保留代表性的等值状态，增广轮廓树在临界节点之间插入大量普通节点，\cite{gueunet_act_2019,gueunet_forests_2016,li_distributed_2024} 但相邻普通节点对应的等值结构往往高度相似，造成冗余——保留全部普通节点会产生近似重复的等值面并增加存储与交互成本，而不加区分地删除又会丢失真实的几何演化。本文在严格保留关键拓扑结构（根、叶、鞍点与分支节点，即连通性与亏格变化的临界点，见 \ref{sec:background} 节）的前提下，沿拓扑链筛选出几何上有代表性的普通节点，从而在位置分布、连通性与亏格、几何特征三个层面同时逼近原始等值面序列。
+本文正是为弥合这一空缺而提出。我们把”选择代表性等值面”具体化为增广轮廓树上的节点筛选问题：为在连续阈值上保留代表性的等值状态，增广轮廓树在临界节点之间插入大量普通节点，\cite{gueunet_act_2019,gueunet_forests_2016,li_distributed_2024} 但相邻普通节点对应的等值结构往往高度相似，造成冗余——保留全部普通节点会产生近似重复的等值面并增加存储与交互成本，而不加区分地删除又会丢失真实的几何演化。本文在严格保留关键拓扑结构（根、叶、鞍点与分支节点，即连通性与亏格变化的临界点，见 \ref{sec:background} 节）的前提下，沿拓扑分支筛选出几何上有代表性的普通节点，从而在位置分布、连通性与亏格、几何特征三个层面同时逼近原始等值面序列。
 
-这一目标落实为三项设计。其一，简化范围受拓扑约束：结构节点全部保留，候选普通节点沿所属拓扑链顺序筛选，简化后通过合并原始弧重建合法树，从而保住连通性与亏格变化所依附的结构节点。其二，基础差异度量按分支实例化：本文统一以原始网格上的局部活性子图刻画分支局部结构，并给出两种可替换的比较方式——活性边集合的 Jaccard 距离与活性子图的 GNN 向量化距离，分别从显式边集与向量化结构两个角度度量几何差异。其三，多分支场景下按重要性加权：一个标量层级可能同时穿过主分支与旁支，本文保留这些分支身份，并按标量跨度型拓扑显著性与几何规模把多个分支的差异汇总为整体差异。据此，本文提出一个拓扑保持的多分支感知增广轮廓树节点简化框架。文末图~\ref{fig:map-genus} 与图~\ref{fig:map-saddle} 以两个示意例说明该框架的拓扑依据：等值面的拓扑属性只在轮廓树的结构节点处改变，而在树边内部保持恒定，因此简化只需在树边内部的普通节点上按几何代表性进行。
+这一目标落实为三项设计。其一，简化范围受拓扑约束：结构节点全部保留，候选普通节点沿所属拓扑分支顺序筛选，简化后通过合并原始弧重建合法树，从而保住连通性与亏格变化所依附的结构节点。其二，基础差异度量按分支实例化：本文统一以原始网格上的局部活性子图刻画分支局部结构，并给出两种可替换的比较方式——活性边集合的 Jaccard 距离与活性子图的 GNN 向量化距离，分别从显式边集与向量化结构两个角度度量几何差异。其三，多分支场景下按重要性加权：一个标量层级可能同时穿过主分支与旁支，本文保留这些分支身份，并按标量跨度型拓扑显著性与几何规模把多个分支的差异汇总为整体差异。据此，本文提出一个拓扑保持的多分支感知增广轮廓树节点简化框架。
+
+\subsection{相关研究}
+\label{sec:related}
+
+围绕等值面表示与轮廓树简化的已有工作可从三个方面梳理：拓扑驱动的合并树与轮廓树简化方法、几何驱动的等值面相似性度量方法，以及面向网格数据的图表示学习方法。
+
+Van Kreveld 等最早将轮廓树引入等值面遍历，以其变体构造可证明规模最小的种子集从连通分量中精确提取等值面。\cite{van_kreveld_1997} Carr 等提出通过合并 Join 树与 Split 树的通用维度轮廓树算法，成为轮廓树计算的标准参考实现。\cite{carr_contour_2003} Edelsbrunner 等引入持久同调，以特征在过滤中的存活时间区分信号与噪声，奠定多尺度拓扑简化的理论基础。\cite{edelsbrunner_persistence_2002} Carr 等为轮廓树分支引入面积、体积以及兼顾空间规模与函数值偏离的超体积等局部几何度量，作为分支剪枝的代价函数。\cite{carr_geometric_2004} 在此基础上，Carr 等提出柔性等值面框架，以轮廓树超级弧索引独立 contour，并结合叶子剪枝与顶点归约实现交互式简化与显示，是本文最直接的相关工作。\cite{carr_flexible_2010} 面向并行计算，Gueunet 等提出值域分割的多线程轮廓森林算法，首次实现共享内存并行的增广轮廓树计算；\cite{gueunet_forests_2016}其后又提出基于 Fibonacci 堆的任务并行增广轮廓树算法，是本文简化工作的直接操作对象。\cite{gueunet_act_2019} Tierny 等开发 Topology ToolKit（TTK），为合并树、轮廓树、Morse-Smale 复形等拓扑结构提供开源标准实现。\cite{tierny_ttk_2018} Lukasczyk 等提出局部化拓扑简化，仅在含未选极值的子体上并行展平，显著提升交互式参数探索的响应速度。\cite{lukasczyk_2020} Li 等进一步将增广、超扫掠与分支分解扩展到分布式环境，使分布式轮廓树可作为科学探索的查询结构。\cite{li_distributed_2024}
+
+Bajaj 等提出等值面谱（contour spectrum），将等值面面积、体积、梯度积分等属性表达为等值的分段 B 样条函数，首次将几何量化方法引入等值面阈值选择。\cite{bajaj_spectrum_1997} Fujishiro 等以标量场临界点分析驱动体绘制传递函数自动设计，是拓扑驱动传递函数路线的开创性工作。\cite{fujishiro_1999} Chiang 与 Lu 提出保持所有可能等值面拓扑的渐进四面体网格简化算法，是拓扑感知网格简化的关键先驱。\cite{chiang_lu_2003} Takahashi 等提取体骨架树（VST），以包含层级与轨道距离等拓扑属性自动设计多维传递函数。\cite{takahashi_2004} Weber 等基于轮廓树分支分解将体数据分割为拓扑一致的区域，为每个分支独立指派传递函数，实现拓扑感知的选择性体绘制。\cite{weber_2007} Bruckner 与 Möller 提出等值面相似性图（ISM），以归一化互信息比较不同阈值下的距离场结构，从相似度矩阵中选出代表性等值面，是等值面几何相似性度量的里程碑。\cite{bruckner_ism_2010} Fofonov 与 Linsen 利用准蒙特卡洛采样近似距离场分布，显著降低 ISM 的计算代价。\cite{fofonov_2014} Fernandes 等以最小费用流与 Hausdorff 距离的插值方法选取代表性等值面，可捕捉拓扑不变时仍存在的几何形变。\cite{fernandes_2016} Tao 等将 ISM 扩展为矩阵形式，同时组织自、时间、变量三类相似图，支持时变多变量体数据的跨变量与跨时间步比较。\cite{tao_2019} Wang 提出基于区间体与等值面面积的 VOA 度量以及基于点距的分割度量，用于自动检测代表性等值与语义化等值面分割。\cite{wang_isomeasure_2020}
+
+Kipf 与 Welling 提出图卷积网络（GCN），通过对称归一化的一阶邻域聚合实现高效的半监督节点分类，是图神经网络最具影响力的基石模型。\cite{kipf_gcn_2017} Hamilton 等提出 GraphSAGE，以邻域采样与可学习聚合器实现大规模图上的归纳式表示学习，可为新节点生成 embedding。\cite{hamilton_graphsage_2017} Gilmer 等提出消息传递神经网络（MPNN）通用框架，将多种 GNN 变体统一到消息、更新与读出三阶段范式下。\cite{gilmer_mpnn_2017} Qi 等提出 PointNet，以对称最大池化直接在无序点云上学习置换不变特征，其处理无序集合的思路对网格学习具有重要启示。\cite{qi_pointnet_2017} Battaglia 等系统综述图网络中的关系归纳偏置，提出统一的图网络（GN）框架并将 CNN、RNN 归为其特例。\cite{battaglia_relational_2018} Verma 等提出 FeaStNet，从学习到的特征动态计算滤波权重与图邻域的软对应关系，用于三维形状分析。\cite{verma_feastnet_2018} Hanocka 等提出 MeshCNN，在三角网格的边上定义卷积与池化操作，以任务驱动的边折叠在保持拓扑的同时实现网格分辨率降低。\cite{hanocka_meshcnn_2019} Xu 等从理论上刻画消息传递 GNN 的判别能力上界，提出可达 Weisfeiler-Leman 测试上界的图同构网络（GIN）。\cite{xu_gin_2019} Pfaff 等提出 MeshGraphNet，以编码-处理-解码架构在非结构化网格上直接学习物理模拟，是网格 GNN 物理建模的标准范式。\cite{pfaff_meshgraphnet_2021} Sharp 等提出 DiffusionNet，以基于 Laplace-Beltrami 算子的学习扩散层实现对分辨率与采样变化自动鲁棒的表面学习，可跨 mesh 与点云表示。\cite{sharp_diffusionnet_2022}
+
+综上，拓扑方法能保住连通性与亏格变化点却难以刻画分支内几何演化，几何方法能度量形状差异却脱离轮廓树分支结构，图表示学习提供了局部结构编码的工具但尚未应用于等值面代表性筛选。三者尚未在同一框架内统一，这一空缺正是本文工作的出发点。
 
 \clearpage
 \begin{thebibliography}{99}
+
+% === 背景 ===
 
 \bibitem{lorensen_cline_1987}
 W. E. Lorensen and H. E. Cline.
 Marching cubes: A high resolution 3D surface construction algorithm.
 \textit{Computer Graphics}, 21(4):163--169, 1987.
-
-\bibitem{van_kreveld_1997}
-M. van Kreveld, R. van Oostrum, C. Bajaj, V. Pascucci, and D. Schikore.
-Contour trees and small seed sets for isosurface traversal.
-\textit{Proceedings of the 13th Annual Symposium on Computational Geometry}, pages 212--220, 1997.
-
-\bibitem{carr_contour_2003}
-H. Carr, J. Snoeyink, and U. Axen.
-Computing contour trees in all dimensions.
-\textit{Computational Geometry}, 24(2):75--94, 2003.
-
-\bibitem{edelsbrunner_persistence_2002}
-H. Edelsbrunner, D. Letscher, and A. Zomorodian.
-Topological persistence and simplification.
-\textit{Discrete \& Computational Geometry}, 28(4):511--533, 2002.
 
 \bibitem{edelsbrunner_harer_2010}
 H. Edelsbrunner and J. L. Harer.
@@ -150,6 +139,23 @@ X. Ni, M. Garland, and J. C. Hart.
 Fair Morse functions for extracting the topological structure of a surface mesh.
 \textit{ACM Transactions on Graphics}, 23(3):613--622, 2004.
 
+% === 2.2.1 拓扑简化 ===
+
+\bibitem{van_kreveld_1997}
+M. van Kreveld, R. van Oostrum, C. Bajaj, V. Pascucci, and D. Schikore.
+Contour trees and small seed sets for isosurface traversal.
+\textit{Proceedings of the 13th Annual Symposium on Computational Geometry}, pages 212--220, 1997.
+
+\bibitem{carr_contour_2003}
+H. Carr, J. Snoeyink, and U. Axen.
+Computing contour trees in all dimensions.
+\textit{Computational Geometry}, 24(2):75--94, 2003.
+
+\bibitem{edelsbrunner_persistence_2002}
+H. Edelsbrunner, D. Letscher, and A. Zomorodian.
+Topological persistence and simplification.
+\textit{Discrete \& Computational Geometry}, 28(4):511--533, 2002.
+
 \bibitem{carr_geometric_2004}
 H. Carr, J. Snoeyink, and M. van de Panne.
 Simplifying flexible isosurfaces using local geometric measures.
@@ -160,10 +166,10 @@ H. Carr, J. Snoeyink, and M. van de Panne.
 Flexible isosurfaces: Simplifying and displaying scalar topology using the contour tree.
 \textit{Computational Geometry}, 43(1):42--58, 2010.
 
-\bibitem{bruckner_ism_2010}
-S. Bruckner and T. M\"oller.
-Isosurface similarity maps.
-\textit{Computer Graphics Forum}, 29(3):773--782, 2010.
+\bibitem{gueunet_forests_2016}
+C. Gueunet, P. Fortin, J. Jomier, and J. Tierny.
+Contour forests: Fast multi-threaded augmented contour trees.
+\textit{IEEE Symposium on Large Data Analysis and Visualization (LDAV)}, pages 85--92, 2016.
 
 \bibitem{gueunet_act_2019}
 C. Gueunet, P. Fortin, J. Jomier, and J. Tierny.
@@ -175,40 +181,69 @@ J. Tierny, G. Favelier, J. A. Levine, C. Gueunet, and M. Michaux.
 The Topology ToolKit.
 \textit{IEEE Transactions on Visualization and Computer Graphics}, 24(1):832--842, 2018.
 
-\bibitem{yan_average_2020}
-L. Yan, Y. Wang, E. Munch, E. Gasparovic, and B. Wang.
-A structural average of labeled merge trees for uncertainty visualization.
-\textit{IEEE Transactions on Visualization and Computer Graphics}, 26(1):832--842, 2020.
-
-\bibitem{pont_wasserstein_2022}
-M. Pont, J. Vidal, J. Delon, and J. Tierny.
-Wasserstein distances, geodesics and barycenters of merge trees.
-\textit{IEEE Transactions on Visualization and Computer Graphics}, 28(1):291--301, 2022.
-
-\bibitem{wetzels_branch_2022}
-F. Wetzels, H. Leitte, and C. Garth.
-Branch decomposition-independent edit distances for merge trees.
-\textit{Computer Graphics Forum}, 41(3):367--378, 2022.
-
-\bibitem{sridharamurthy_local_2023}
-R. Sridharamurthy and V. Natarajan.
-Comparative analysis of merge trees using local tree edit distance.
-\textit{IEEE Transactions on Visualization and Computer Graphics}, 29(2):1518--1530, 2023.
-
-\bibitem{yan_geometry_2023}
-L. Yan, T. B. Masood, F. Rasheed, I. Hotz, and B. Wang.
-Geometry-aware merge tree comparisons for time-varying data with interleaving distances.
-\textit{IEEE Transactions on Visualization and Computer Graphics}, 29(8):3489--3506, 2023.
-
-\bibitem{gueunet_forests_2016}
-C. Gueunet, P. Fortin, J. Jomier, and J. Tierny.
-Contour forests: Fast multi-threaded augmented contour trees.
-\textit{IEEE Symposium on Large Data Analysis and Visualization (LDAV)}, pages 85--92, 2016.
+\bibitem{lukasczyk_2020}
+J. Lukasczyk, C. Garth, R. Maciejewski, and J. Tierny.
+Localized topological simplification of scalar data.
+\textit{IEEE Transactions on Visualization and Computer Graphics}, 27(2):572--582, 2020.
 
 \bibitem{li_distributed_2024}
 M. Li, H. Carr, O. R\"ubel, B. Wang, and G. H. Weber.
 Distributed augmentation, hypersweeps, and branch decomposition of contour trees for scientific exploration.
 \textit{IEEE Transactions on Visualization and Computer Graphics}, 2024.
+
+% === 2.2.2 等值面几何简化 ===
+
+\bibitem{bajaj_spectrum_1997}
+C. L. Bajaj, V. Pascucci, and D. R. Schikore.
+The contour spectrum.
+\textit{IEEE Visualization}, pages 167--174, 1997.
+
+\bibitem{fujishiro_1999}
+I. Fujishiro, T. Azuma, and Y. Takeshima.
+Automating transfer function design for comprehensible volume rendering based on 3D field topology analysis.
+\textit{IEEE Visualization}, pages 467--470, 1999.
+
+\bibitem{chiang_lu_2003}
+Y.-J. Chiang and X. Lu.
+Progressive simplification of tetrahedral meshes preserving all isosurface topologies.
+\textit{Computer Graphics Forum}, 22(3):493--504, 2003.
+
+\bibitem{takahashi_2004}
+S. Takahashi, Y. Takeshima, and I. Fujishiro.
+Topological volume skeletonization and its application to transfer function design.
+\textit{Graphical Models}, 66(1):24--49, 2004.
+
+\bibitem{weber_2007}
+G. H. Weber, S. E. Dillard, H. Carr, V. Pascucci, and B. Hamann.
+Topology-controlled volume rendering.
+\textit{IEEE Transactions on Visualization and Computer Graphics}, 13(2):330--341, 2007.
+
+\bibitem{bruckner_ism_2010}
+S. Bruckner and T. M\"oller.
+Isosurface similarity maps.
+\textit{Computer Graphics Forum}, 29(3):773--782, 2010.
+
+\bibitem{fofonov_2014}
+A. Fofonov and L. Linsen.
+Fast and robust isosurface similarity maps extraction using quasi-Monte Carlo approach.
+\textit{European Conference on Data Analysis (ECDA)}, 2014.
+
+\bibitem{fernandes_2016}
+D. Fernandes, S. Frey, and T. Ertl.
+Interpolation-based extraction of representative isosurfaces.
+\textit{International Symposium on Visual Computing (ISVC)}, LNCS, 2016.
+
+\bibitem{tao_2019}
+J. Tao, E. Imre, C. Wang, N. V. Chawla, H. Guo, G. Sever, and S.-H. Kim.
+Exploring time-varying multivariate volume data using matrix of isosurface similarity maps.
+\textit{IEEE Transactions on Visualization and Computer Graphics}, 25(1):1236--1245, 2019.
+
+\bibitem{wang_isomeasure_2020}
+Z. Wang.
+Representative isovalue detection and isosurface segmentation using novel isosurface measures.
+\textit{Computer Graphics Forum}, 39(3):37--47, 2020.
+
+% === 2.2.3 图表示学习 ===
 
 \bibitem{kipf_gcn_2017}
 T. N. Kipf and M. Welling.
@@ -220,113 +255,46 @@ W. L. Hamilton, R. Ying, and J. Leskovec.
 Inductive representation learning on large graphs.
 \textit{Advances in Neural Information Processing Systems}, 30, 2017.
 
+\bibitem{gilmer_mpnn_2017}
+J. Gilmer, S. S. Schoenholz, P. F. Riley, O. Vinyals, and G. E. Dahl.
+Neural message passing for quantum chemistry.
+\textit{International Conference on Machine Learning}, pages 1263--1272, 2017.
+
+\bibitem{qi_pointnet_2017}
+C. R. Qi, H. Su, K. Mo, and L. J. Guibas.
+PointNet: Deep learning on point sets for 3D classification and segmentation.
+\textit{IEEE Conference on Computer Vision and Pattern Recognition}, pages 652--660, 2017.
+
+\bibitem{battaglia_relational_2018}
+P. W. Battaglia, J. B. Hamrick, V. Bapst, A. Sanchez-Gonzalez, et~al.
+Relational inductive biases, deep learning, and graph networks.
+\textit{arXiv preprint arXiv:1806.01261}, 2018.
+
+\bibitem{verma_feastnet_2018}
+N. Verma, E. Boyer, and J. Verbeek.
+FeaStNet: Feature-steered graph convolutions for 3D shape analysis.
+\textit{IEEE Conference on Computer Vision and Pattern Recognition}, pages 2598--2606, 2018.
+
+\bibitem{hanocka_meshcnn_2019}
+R. Hanocka, A. Hertz, N. Fish, R. Giryes, S. Fleishman, and D. Cohen-Or.
+MeshCNN: A network with an edge.
+\textit{ACM Transactions on Graphics}, 38(4):90:1--90:12, 2019.
+
 \bibitem{xu_gin_2019}
 K. Xu, W. Hu, J. Leskovec, and S. Jegelka.
 How powerful are graph neural networks?
 \textit{International Conference on Learning Representations}, 2019.
 
+\bibitem{pfaff_meshgraphnet_2021}
+T. Pfaff, M. Fortunato, A. Sanchez-Gonzalez, and P. W. Battaglia.
+Learning mesh-based simulation with graph networks.
+\textit{International Conference on Learning Representations}, 2021.
+
+\bibitem{sharp_diffusionnet_2022}
+N. Sharp, S. Attaiki, K. Crane, and M. Ovsjanikov.
+DiffusionNet: Discretization agnostic learning on surfaces.
+\textit{ACM Transactions on Graphics}, 41(3):27:1--27:16, 2022.
+
 \end{thebibliography}
-
-\begin{figure}[h]
-\centering
-\begin{tikzpicture}[
-  y=0.5cm, x=1.0cm,
-  crit node/.style={circle, draw=black, fill=gray!25, thick, inner sep=1pt, minimum size=13pt, font=\sffamily\scriptsize},
-  reg node/.style={circle, draw=black, fill=white, inner sep=0.5pt, minimum size=8pt, font=\sffamily\tiny},
-  main edge/.style={very thick, draw=black},
-  iso/.style={very thick, draw=green!45!black},
-  lev/.style={densely dashed, draw=red!70!black, line width=0.6pt},
-  lab/.style={font=\scriptsize, text=black!70},
-]
-% ---- contour tree edge (left) ----
-\node[crit node] (vj)  at (0, 0)  {$v_j$};
-\node[reg node]  (a)   at (0, 2)  {};
-\node[reg node]  (b)   at (0, 4)  {};
-\node[crit node] (vj1) at (0, 6)  {$v_{j+1}$};
-\draw[main edge] (vj) -- (vj1);
-\node[lab, left=1mm of vj]  {$f\!=\!\alpha_1$};
-\node[lab, left=1mm of vj1] {$f\!=\!\alpha_2$};
-\node[lab, align=center] at (0,-1.6) {一条树边\\（map 区间）};
-
-% level guides to isosurface sketches
-\draw[lev] (a) -- (2.0,2);
-\draw[lev] (b) -- (2.0,4);
-\draw[lev] (vj1) -- (2.0,6);
-
-% ---- three isosurfaces, all genus 1 (tori), only size changes ----
-\begin{scope}[shift={(3.1,2)}]
-  \draw[iso] (0,0) ellipse (0.5 and 0.32);
-  \draw[iso] (0,0) ellipse (0.20 and 0.12);
-\end{scope}
-\begin{scope}[shift={(3.1,4)}]
-  \draw[iso] (0,0) ellipse (0.66 and 0.42);
-  \draw[iso] (0,0) ellipse (0.26 and 0.16);
-\end{scope}
-\begin{scope}[shift={(3.1,6)}]
-  \draw[iso] (0,0) ellipse (0.82 and 0.52);
-  \draw[iso] (0,0) ellipse (0.32 and 0.20);
-\end{scope}
-\node[lab, align=center, text=green!35!black] at (3.1,-1.6) {亏格恒为 $g\!=\!1$\\仅大小变化};
-\end{tikzpicture}
-\caption{同一条树边（map 区间）内，等值面亏格与连通性不变。区间 $[\alpha_1,\alpha_2]$ 对应一条边，其上三个阈值层级抽取的等值面均为环面（$g=1$），只有几何规模连续变化，故链内普通节点高度冗余。}
-\label{fig:map-genus}
-\end{figure}
-
-\begin{figure}[h]
-\centering
-\begin{tikzpicture}[
-  y=0.5cm, x=1.0cm,
-  crit node/.style={circle, draw=black, fill=gray!25, thick, inner sep=1pt, minimum size=13pt, font=\sffamily\scriptsize},
-  sad node/.style={circle, draw=black, fill=blue!55!cyan!80, thick, inner sep=1pt, minimum size=13pt, font=\sffamily\scriptsize, text=white},
-  main edge/.style={very thick, draw=black},
-  iso/.style={very thick, draw=green!45!black},
-  lev/.style={densely dashed, draw=red!70!black, line width=0.6pt},
-  lab/.style={font=\scriptsize, text=black!70},
-]
-% ---- tree: 3 minima (low scalar, bottom) merge upward via 2 saddles ----
-% scalar increases upward; low end has 3 components, top has 1
-\node[crit node] (L1) at (-1.6, 0) {};
-\node[crit node] (L2) at ( 0.0, 0) {};
-\node[crit node] (L3) at ( 1.6, 0) {};
-\node[sad node]  (S1) at (-0.8, 2.4) {$S_1$};
-\node[sad node]  (S2) at ( 0.2, 4.4) {$S_2$};
-\node[crit node] (R)  at ( 0.2, 6.4) {};
-\draw[main edge] (L1) -- (S1);
-\draw[main edge] (L2) -- (S1);
-\draw[main edge] (S1) -- (S2);
-\draw[main edge] (L3) -- (S2);
-\draw[main edge] (S2) -- (R);
-\node[lab, left=0.5mm of L1] {$f\!=\!\alpha_1$};
-\node[lab, right=0.5mm of R] {$f\!=\!\alpha_3$};
-\node[lab, align=center] at (0,-1.6) {三分支经\\两鞍点合并};
-
-% three level lines: below S1 (3 comps), between S1,S2 (2 comps), above S2 (1 comp)
-\draw[lev] (-1.6,1.0) -- (3.4,1.0);
-\draw[lev] (-0.6,3.4) -- (3.4,3.4);
-\draw[lev] ( 0.2,5.4) -- (3.4,5.4);
-
-% ---- level 1 (bottom): three separate spheres, c=3, g=0 ----
-\begin{scope}[shift={(4.2,1.0)}]
-  \draw[iso] (-0.5,0) circle (0.22);
-  \draw[iso] ( 0.0,0) circle (0.22);
-  \draw[iso] ( 0.5,0) circle (0.22);
-\end{scope}
-\node[lab, align=center, text=green!35!black] at (4.2,-1.6) {$c\!=\!3,\ g\!=\!0$};
-
-% ---- level 2 (middle): two spheres after S1 merge, c=2, g=0 ----
-\begin{scope}[shift={(4.2,3.4)}]
-  \draw[iso] (-0.32,0) circle (0.30);
-  \draw[iso] ( 0.5,0) circle (0.24);
-\end{scope}
-
-% ---- level 3 (top): one sphere after S2 merge, c=1, g=0 ----
-\begin{scope}[shift={(4.2,5.4)}]
-  \draw[iso] (0,0) circle (0.40);
-\end{scope}
-\node[lab, align=center, text=green!35!black] at (4.2,6.8) {$c\!=\!1,\ g\!=\!0$};
-\end{tikzpicture}
-\caption{阈值穿过结构节点（鞍点）时连通性跳变。标量自下（$\alpha_1$）向上（$\alpha_3$）扫掠，等值面的连通分量数经鞍点 $S_1$ 由 $c=3$ 合并为 $c=2$、再经 $S_2$ 合并为 $c=1$（均为球面 $g=0$）。连通性只在结构节点处改变，故结构节点必须保留；此例也说明轮廓树只表达连通性、不直接给出亏格。}
-\label{fig:map-saddle}
-\end{figure}
 
 \end{document}
