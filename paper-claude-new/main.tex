@@ -30,6 +30,7 @@
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 \usepackage{float}
+\usepackage{dblfloatfix}
 
 \title{\textbf{基于图神经网络的几何过滤增广轮廓树}\\[6pt]
   \large\textmd{Geometric Filtered Augmented Contour Tree Using Graph Neural Network}}
@@ -99,7 +100,52 @@
 
 本文正是为弥合这一空缺而提出。我们把”选择代表性等值面”具体化为增广轮廓树上的节点筛选问题：为在连续阈值上保留代表性的等值状态，增广轮廓树在临界节点之间插入大量普通节点，\cite{gueunet_act_2019,gueunet_forests_2016,li_distributed_2024} 但相邻普通节点对应的等值结构往往高度相似，造成冗余——保留全部普通节点会产生近似重复的等值面并增加存储与交互成本，而不加区分地删除又会丢失真实的几何演化。本文在严格保留关键拓扑结构（根、叶、鞍点与分支节点，即连通性与亏格变化的临界点，见 \ref{sec:background} 节）的前提下，沿拓扑分支筛选出几何上有代表性的普通节点，从而在位置分布、连通性与亏格、几何特征三个层面同时逼近原始等值面序列。
 
-这一目标落实为三项设计。其一，简化范围受拓扑约束：结构节点全部保留，候选普通节点沿所属拓扑分支顺序筛选，简化后通过合并原始弧重建合法树，从而保住连通性与亏格变化所依附的结构节点。其二，基础差异度量按分支实例化：本文统一以原始网格上的局部活性子图刻画分支局部结构，并给出两种可替换的比较方式——活性边集合的 Jaccard 距离与活性子图的 GNN 向量化距离，分别从显式边集与向量化结构两个角度度量几何差异。其三，多分支场景下按重要性加权：一个标量层级可能同时穿过主分支与旁支，本文保留这些分支身份，并按标量跨度型拓扑显著性与几何规模把多个分支的差异汇总为整体差异。据此，本文提出一个拓扑保持的多分支感知增广轮廓树节点简化框架。
+这一目标落实为三项设计。其一，简化范围受拓扑约束：结构节点全部保留，候选普通节点沿所属拓扑分支顺序筛选，简化后通过合并原始弧重建合法树，从而保住连通性与亏格变化所依附的结构节点。其二，基础差异度量按分支实例化：本文统一以原始网格上的局部活性子图刻画分支局部结构，并给出两种可替换的比较方式——活性边集合的 Jaccard 距离与活性子图的 GNN 向量化距离，分别从显式边集与向量化结构两个角度度量几何差异。其三，多分支场景下按重要性加权：一个标量层级可能同时穿过主分支与旁支，本文保留这些分支身份，并按标量跨度型拓扑显著性与几何规模把多个分支的差异汇总为整体差异。据此，本文提出一个拓扑保持的基于多分支加权的增广轮廓树节点简化框架。
+
+\begin{figure*}[t]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+    node distance=0.6cm and 0.4cm,
+    box/.style={rectangle, draw=black!70, fill=blue!6, thick, rounded corners=3pt,
+                minimum height=1.1cm, minimum width=2.8cm, align=center,
+                font=\small},
+    iobox/.style={rectangle, draw=black!70, fill=orange!10, thick, rounded corners=3pt,
+                  minimum height=1.1cm, minimum width=2.8cm, align=center,
+                  font=\small},
+    arr/.style={-{Stealth[length=2.2mm]}, thick, draw=black!70},
+    lab/.style={font=\scriptsize, text=black!60, align=center},
+]
+% 输入
+\node[iobox] (input) {标量场 $f$ 上的\\增广轮廓树 $T$};
+% Step 1
+\node[box, right=of input] (branch) {拓扑分支分解\\+ 多分支权重\\{\scriptsize(\S\ref{sec:branch-weight})}};
+% Step 2
+\node[box, right=of branch] (genus) {亏格不变区间\\划分与映射\\{\scriptsize(\S\ref{sec:genus-interval})}};
+% Step 3
+\node[box, right=of genus] (geo) {分支几何\\差异度量\\{\scriptsize(\S\ref{sec:geo-repr})}};
+% Step 4
+\node[box, right=of geo] (greedy) {贪心简化\\+ 树重建\\{\scriptsize(\S\ref{sec:greedy})}};
+% 输出
+\node[iobox, right=of greedy] (output) {几何过滤\\增广轮廓树 $T'$};
+
+% 箭头
+\draw[arr] (input) -- (branch);
+\draw[arr] (branch) -- (genus);
+\draw[arr] (genus) -- (geo);
+\draw[arr] (geo) -- (greedy);
+\draw[arr] (greedy) -- (output);
+
+% 底部注释
+\node[lab, below=0.25cm of branch] {$w^{\mathrm{topo}}_\ell,\,w^{\mathrm{geo}}_\ell \to w_\ell$};
+\node[lab, below=0.25cm of genus] {保留所有结构节点};
+\node[lab, below=0.25cm of geo] {Jaccard / GNN};
+\node[lab, below=0.25cm of greedy] {$D \geq \varepsilon$ 则保留};
+\end{tikzpicture}%
+}% end resizebox
+\caption{方法整体流程。输入增广轮廓树经拓扑分支分解、亏格不变区间划分、分支几何差异计算后，由贪心算法筛选保留节点并重建简化树。}
+\label{fig:pipeline}
+\end{figure*}
 
 \subsection{相关研究}
 \label{sec:related}
@@ -116,7 +162,14 @@ Kipf 与 Welling 提出图卷积网络（GCN），通过对称归一化的一阶
 
 \section{方法}
 
-本节给出基于几何过滤的增广轮廓树节点简化方法。输入为定义在规则网格 $\Omega$ 上的标量场 $f:\Omega\rightarrow\mathbb{R}$ 及其增广轮廓树 $T=(V,E,f)$，输出为几何过滤增广轮廓树 $T'$——在严格保留连通性与亏格变化临界点的前提下，沿拓扑分支筛选出几何上有代表性的普通节点后重建而得的简化树。全文按以下逻辑展开：\ref{sec:branch-weight} 节定义拓扑分支并给出多分支权重设计；\ref{sec:genus-interval} 节说明亏格不变区间的划分与分支映射；\ref{sec:geo-repr} 节在每条分支上定义局部活性子图并给出两种几何表示学习方法（Jaccard 距离与 GNN 向量化距离）；\ref{sec:greedy} 节将前述组件统一为多分支感知的贪心简化算法。
+本节给出基于几何过滤的增广轮廓树节点简化方法。输入为规则网格 $\Omega$ 上的标量场 $f:\Omega\rightarrow\mathbb{R}$ 及其增广轮廓树 $T=(V,E,f)$，输出为几何过滤增广轮廓树 $T'$——在严格保留连通性与亏格变化临界点的前提下，沿拓扑分支筛选出几何上有代表性的普通节点后重建而得的简化树。图~\ref{fig:framework} 给出了核心概念的直观示意：增广轮廓树的临界点将标量轴划分为若干亏格不变区间，每条拓扑分支对应一个区间，分支内部等值面拓扑不变、仅有几何演化。全文按以下逻辑展开：\ref{sec:branch-weight} 节定义拓扑分支与多分支权重；\ref{sec:genus-interval} 节说明亏格不变区间；\ref{sec:geo-repr} 节给出两种几何差异度量；\ref{sec:greedy} 节统一为贪心简化算法。
+
+\begin{figure*}[t]
+\centering
+\resizebox{!}{0.42\textheight}{\input{fig-framework.tex}}
+\caption{增广轮廓树与亏格不变区间。左：增广轮廓树（灰色圆为结构节点，白色圆为普通节点）；右：临界点投影到标量轴后划分出的亏格不变区间 $I_1$--$I_7$（颜色表示连通分量数 $c$，各区间内亏格 $g$ 保持不变）。}
+\label{fig:framework}
+\end{figure*}
 
 % ========================================
 % 3.1 拓扑分支分解与多分支权重
@@ -124,47 +177,26 @@ Kipf 与 Welling 提出图卷积网络（GCN），通过对称归一化的一阶
 \subsection{拓扑分支分解与多分支权重}
 \label{sec:branch-weight}
 
-\paragraph{拓扑分支。}增广轮廓树的节点按拓扑角色分为两类：结构节点集合 $V_s$（根节点、叶节点/极值点和分支节点/鞍点）记录连通性和亏格的变化；普通节点集合 $V_o=V\setminus V_s$（度数为 $2$、不改变连通性的增广节点）记录中间等值面状态。从每个结构节点出发，沿度数为 $2$ 的普通节点连续游走直到到达下一个结构节点，即得一条\textbf{拓扑分支}（topological branch）
-\begin{equation}
-b=(v_0,v_1,\ldots,v_k),
-\label{eq:branch-def}
-\end{equation}
-其中 $v_0$、$v_k$ 为必须保留的结构节点，中间节点按标量值排序定向，全为候选普通节点。整棵增广轮廓树被这些拓扑分支无重叠地分解。
+增广轮廓树的节点按拓扑角色分为两类：结构节点集合 $V_s$（根、叶/极值点和分支节点/鞍点）记录连通性与亏格的变化；普通节点集合 $V_o=V\setminus V_s$（度数为~$2$ 的增广节点）记录中间等值面状态。从每个结构节点出发，沿度数为~$2$ 的普通节点连续游走到下一个结构节点，即得一条\textbf{拓扑分支}（topological branch）$b_\ell=(v_0,v_1,\ldots,v_k)$，其中 $v_0,v_k\in V_s$ 为必须保留的端点，中间节点按标量值定向排列，全为候选普通节点。整棵增广轮廓树被这些分支无重叠地分解。
 
-\paragraph{分支的标量跨度型拓扑显著性。}每条拓扑分支 $b_\ell$ 的标量范围记为 $[f_{\min}(b_\ell),f_{\max}(b_\ell)]$，其标量跨度定义为
-\begin{equation}
-\pi_\ell = f_{\max}(b_\ell)-f_{\min}(b_\ell),
-\end{equation}
-可视为持久性思想在本文拓扑分支定义下的工程近似：$\pi_\ell$ 越大，该分支承载的标量演化范围越宽，在全局结构中越显著。
-
-\paragraph{活跃分支集合。}在轮廓树中，同一标量层级可能同时穿过多条拓扑分支。对候选节点 $v_i$（阈值 $t_i=f(v_i)$），其活跃分支集合定义为
+每条分支 $b_\ell$ 的标量跨度 $\pi_\ell = f_{\max}(b_\ell)-f_{\min}(b_\ell)$ 刻画其承载的标量演化范围，可视为持久性在分支层面的近似。在轮廓树中，同一标量层级 $t_i=f(v_i)$ 可能穿过多条分支，记活跃分支集合为
 \begin{equation}
 \mathcal{B}(t_i)=\{\,b_\ell\mid f_{\min}(b_\ell)\leq t_i\leq f_{\max}(b_\ell)\,\}.
 \label{eq:active-branch}
 \end{equation}
-这些分支共同构成该层级上等值面的完整拓扑与几何背景，节点筛选判定应同时考虑所有活跃分支的变化。
-
-\paragraph{拓扑权重。}对活跃分支集合 $\mathcal{B}(t_i)$ 中的每条分支 $b_\ell$，其拓扑权重定义为
+节点筛选应同时考虑所有活跃分支的变化。为此，对每条活跃分支 $b_\ell$ 定义两类权重：拓扑权重 $w^{\mathrm{topo}}_\ell$ 按标量跨度归一化，几何规模权重 $w^{\mathrm{geo}}_\ell$ 按该分支在当前层级的活性边数 $s_\ell$（见 \ref{sec:geo-repr} 节）归一化：
 \begin{equation}
-w^{\mathrm{topo}}_\ell=\frac{\pi_\ell}{\sum_{k:\,b_k\in\mathcal{B}(t_i)}\pi_k},
-\label{eq:wtopo}
+w^{\mathrm{topo}}_\ell=\frac{\pi_\ell}{\sum_{k:\,b_k\in\mathcal{B}(t_i)}\pi_k},\qquad
+w^{\mathrm{geo}}_\ell=\frac{s_\ell}{\sum_{k:\,b_k\in\mathcal{B}(t_i)} s_k}.
+\label{eq:weights}
 \end{equation}
-使标量跨度较大的主分支获得更高权重，体现其在全局拓扑结构中的重要性。
-
-\paragraph{几何规模权重。}除拓扑显著性外，分支在当前层级的局部几何规模也应影响权重。记分支 $b_\ell$ 在候选节点 $v_i$ 处的局部活性子图规模（活性边数，见 \ref{sec:geo-repr} 节）为 $s_\ell$，则几何规模权重为
-\begin{equation}
-w^{\mathrm{geo}}_\ell=\frac{s_\ell}{\sum_{k:\,b_k\in\mathcal{B}(t_i)} s_k},
-\label{eq:wgeo}
-\end{equation}
-使局部结构规模大的分支获得更高权重。
-
-\paragraph{混合权重。}二者通过混合系数 $\alpha\in[0,1]$ 线性组合并归一化为最终权重
+二者通过混合系数 $\alpha\in[0,1]$ 线性组合为最终权重
 \begin{equation}
 w_\ell=\frac{\alpha\,w^{\mathrm{topo}}_\ell+(1-\alpha)\,w^{\mathrm{geo}}_\ell}
 {\sum_{k}\bigl[\alpha\,w^{\mathrm{topo}}_k+(1-\alpha)\,w^{\mathrm{geo}}_k\bigr]}.
 \label{eq:wmix}
 \end{equation}
-$\alpha=1$ 退化为纯拓扑权重，$\alpha=0$ 退化为纯几何规模权重。纯拓扑权重倾向于保护标量跨度大的主分支，但可能低估跨度不大却正经历明显截交变化的旁支；纯几何规模权重响应局部结构规模，却可能让大分支持续主导而稀释小而拓扑重要的分支。通过 $\alpha$ 混合可在二者之间取得折中。各活跃分支的局部差异 $d_\ell$（定义见 \ref{sec:geo-repr} 节）经 $w_\ell$ 加权汇总为整体差异
+$\alpha=1$ 退化为纯拓扑权重，倾向保护标量跨度大的主分支但可能低估正经历显著截交变化的旁支；$\alpha=0$ 退化为纯几何规模权重，响应局部结构规模但可能稀释拓扑上重要的小分支。各活跃分支的局部差异 $d_\ell$（定义见 \ref{sec:geo-repr} 节）经权重汇总为整体差异
 \begin{equation}
 D(v_r,v_i)=\sum_{\ell:\,b_\ell\in\mathcal{B}(t_i)} w_\ell\, d_\ell(v_r,v_i),\qquad \sum_\ell w_\ell=1,
 \label{eq:aggregate}
@@ -177,27 +209,11 @@ D(v_r,v_i)=\sum_{\ell:\,b_\ell\in\mathcal{B}(t_i)} w_\ell\, d_\ell(v_r,v_i),\qqu
 \subsection{亏格不变区间与分支映射}
 \label{sec:genus-interval}
 
-\paragraph{亏格不变区间。}如 \ref{sec:background} 节所述，Morse 理论保证：只有当阈值穿过轮廓树的临界点（结构节点）时等值面的拓扑才会跳变，每个临界点对欧拉示性数的贡献为 $\Delta\chi=(-1)^i$（$i$ 为 Morse 指数）。由此可知，在两个相邻结构节点之间的标量区间内，等值面的连通分量数和亏格均保持不变——这正是拓扑分支内部"拓扑不变"的理论根据。
+Morse 理论保证：只有当阈值穿过轮廓树的临界点（结构节点）时等值面的拓扑才发生跳变，每个临界点对欧拉示性数的贡献为 $\Delta\chi=(-1)^i$（$i$ 为 Morse 指数）。因此，在两个相邻结构节点之间的标量区间内，等值面的连通分量数和亏格均保持不变。对拓扑分支 $b_\ell=(v_0,\ldots,v_k)$，其端点 $v_0,v_k\in V_s$ 之间的开区间 $(f(v_0),f(v_k))$ 不含其他临界点，即为一个\textbf{亏格不变区间}（genus-invariant interval）。在此区间内，等值面的拓扑类型不随阈值变化，只有几何形状可能演化——这正是在分支内部做纯几何筛选的理论基础。
 
-形式上，设拓扑分支 $b_\ell=(v_0,\ldots,v_k)$ 的端点 $v_0,v_k$ 为结构节点，则标量区间 $(f(v_0),f(v_k))$ 内不存在其他临界点，该区间即为一个\textbf{亏格不变区间}（genus-invariant interval）。在此区间内，等值面的拓扑类型（连通分量数 $c$ 和亏格 $g$）不随阈值变化，只有几何形状可能演化。
+这一映射具有三方面关键保证：（1）分支内部拓扑不变——任意两个普通节点的等值面具有相同的连通分量数和亏格，二者差异纯粹是几何差异；（2）亏格变化仅发生在端点——一阶鞍点使亏格增加、二阶鞍点使其减少，本文通过保留所有结构节点来保证亏格变化点不被删除；（3）分支间互不干涉——同一层级穿过的多条分支各自对应独立的亏格不变区间，几何比较被严格限制在各分支内部（\ref{sec:geo-repr} 节）。
 
-\paragraph{分支与亏格不变区间的映射。}每条拓扑分支 $b_\ell$ 自然对应一个亏格不变区间 $I_\ell=(f(v_0),f(v_k))$。这一映射具有以下关键性质：
-
-（1）\textbf{分支内部拓扑不变}：对 $b_\ell$ 上的任意两个普通节点 $v_i,v_j$，其对应的等值面具有相同的连通分量数和亏格。因此，两者之间的差异纯粹是几何差异，可用几何度量（\ref{sec:geo-repr} 节）来刻画。
-
-（2）\textbf{亏格变化仅发生在端点}：等值面的亏格跳变编码在分支端点（结构节点）上，包括一阶鞍点（$i=1$，使 $g$ 增加）和二阶鞍点（$i=2$，使 $g$ 减少）。本文通过保留所有结构节点来保证亏格变化点不被删除。
-
-（3）\textbf{连通分支感知}：同一标量层级 $t_i$ 可能穿过多条拓扑分支（式~\eqref{eq:active-branch}），每条分支对应一个独立的亏格不变区间。本文通过分支局部化（\ref{sec:geo-repr} 节）确保几何比较被限制在各自的亏格不变区间内，避免跨分支混合。
-
-% 预留 ConnectivityMergeTree 图位置
-% \begin{figure*}[t]
-% \centering
-% \input{ConnectivityMergeTree.tex}
-% \caption{增广轮廓树与亏格不变区间映射示意。左：增广轮廓树（临界节点彩色标注）；中：标量轴分区与各区间亏格标注；右：对应等值面三维示意。}
-% \label{fig:genus-interval}
-% \end{figure*}
-
-这一结构保证了本文方法的理论正确性：结构节点全部保留确保不丢失任何亏格变化事件；分支内部仅做几何筛选，不会引入或遗漏拓扑事件；多分支加权（\ref{sec:branch-weight} 节）保持各分支的独立性，不跨越亏格不变区间进行混合比较。
+综合以上，结构节点全部保留确保不丢失任何亏格变化事件；分支内部仅做几何筛选，不会引入或遗漏拓扑事件；多分支加权保持各分支的独立性，不跨越亏格不变区间混合比较。
 
 % ========================================
 % 3.3 分支上的几何表示学习
@@ -205,107 +221,59 @@ D(v_r,v_i)=\sum_{\ell:\,b_\ell\in\mathcal{B}(t_i)} w_\ell\, d_\ell(v_r,v_i),\qqu
 \subsection{分支上的几何表示学习}
 \label{sec:geo-repr}
 
-由 \ref{sec:genus-interval} 节可知，拓扑分支内部等值面的差异纯粹是几何差异。本节定义统一的局部结构描述子——活性子图，并给出两种可替换的几何差异度量：活性边集合的 Jaccard 距离与活性子图的 GNN 向量化距离。
+由 \ref{sec:genus-interval} 节可知，拓扑分支内部等值面的差异纯粹是几何差异。本节定义统一的局部结构描述子——活性子图，并给出两种可替换的差异度量。
 
 \subsubsection{局部活性子图}
 \label{sec:subgraph}
 
-\paragraph{活性边与活性子图。}等值面 $\{x\mid f(x)=t\}$ 在规则网格上的离散痕迹，是那些被该等值面穿过的网格边。对原始网格边 $(p,q)$，若其两端点标量值跨越阈值 $t=f(v)$：
-\begin{equation}
-f(p)\leq t<f(q)\quad\text{或}\quad f(q)\leq t<f(p),
-\label{eq:active-edge}
-\end{equation}
-则称该边为阈值 $t$ 下的\textbf{活性边}。所有活性边及其端点构成\textbf{局部活性子图}
-\begin{equation}
-G_\ell(v)=\bigl(V_{\mathrm{act}}(v),\,E_{\mathrm{act}}(v)\bigr).
-\end{equation}
-相比直接重建等值面三角网格，活性子图无需插值和三角化，天然保留原始网格的连通关系，把"等值面扫过了哪些局部结构"这一问题转化为对一组网格边的比较。
+等值面在规则网格上的离散痕迹，是被其穿过的网格边。若网格边 $(p,q)$ 的两端标量值跨越阈值 $t=f(v)$（即 $f(p)\leq t < f(q)$ 或反之），则称该边为阈值 $t$ 下的\textbf{活性边}；所有活性边及其端点构成\textbf{局部活性子图} $G_\ell(v)=(V_{\mathrm{act}},E_{\mathrm{act}})$。相比直接重建等值面三角网格，活性子图无需插值和三角化，天然保留原始网格连通关系，把"等值面扫过了哪些局部结构"转化为边集比较问题。
 
-\paragraph{分支局部化。}为把比较限制在当前分支 $b_\ell$ 的亏格不变区间内、排除同一阈值下其他分支的无关活性边，遍历范围由 $b_\ell$ 关联弧的分割标签（SegmentationId）集合确定：仅在这些分割区域的联合包围盒内枚举网格边，并要求边的至少一个端点落在目标分割内。由此得到的 $G_\ell(v)$ 只反映 $b_\ell$ 上的等值面截交结构，保证了分支间互不干扰。
+为把比较限制在当前分支 $b_\ell$ 的亏格不变区间内，遍历范围由 $b_\ell$ 关联弧的分割标签（SegmentationId）确定：仅在目标分割区域的联合包围盒内枚举网格边，并要求至少一个端点落在该分割内，从而排除同层级其他分支的无关活性边。
 
 \subsubsection{活性边集合的 Jaccard 差异}
 \label{sec:jaccard}
 
-第一种几何差异度量直接比较两个节点活性边集合的重合程度。由于所有活性子图都嵌在同一母网格上、共享一致的网格边编号，边集重合程度具有明确含义：重合度高说明等值面在该分支上扫过的局部结构基本未变；差异越大说明等值面已移动到新的网格区域。
-
-记 $E_{\mathrm{act}}(v_r)$、$E_{\mathrm{act}}(v_i)$ 为参考节点与候选节点在分支 $b_\ell$ 上的活性边集合，Jaccard 差异为
+第一种度量直接比较参考节点与候选节点的活性边集合重合程度。由于所有活性子图嵌在同一母网格上、共享一致的边编号，重合度高说明等值面在该分支上的截交结构基本未变。记两节点在分支 $b_\ell$ 上的活性边集合为 $E_{\mathrm{act}}(v_r)$ 和 $E_{\mathrm{act}}(v_i)$，Jaccard 差异为
 \begin{equation}
 d^{J}_\ell=1-\frac{|E_{\mathrm{act}}(v_r)\cap E_{\mathrm{act}}(v_i)|}{|E_{\mathrm{act}}(v_r)\cup E_{\mathrm{act}}(v_i)|}.
 \label{eq:jaccard}
 \end{equation}
-然而纯边集 Jaccard 对等值面轻微平移较敏感。为缓解这一点，引入质心位移项与包围盒尺度变化项作为几何补偿。设活性子图顶点集 $V_{\mathrm{act}}(v)$ 的质心为 $c(v)$、包围盒对角线长度为 $\mathrm{diag}(v)$：
-\begin{align}
-d^{\mathrm{pos}}_\ell&=\frac{\lVert c(v_r)-c(v_i)\rVert}{\max\bigl(\mathrm{diag}(v_r),\,\epsilon_0\bigr)},
-\label{eq:jpos}\\[2pt]
-d^{\mathrm{bbox}}_\ell&=\frac{\bigl|\mathrm{diag}(v_r)-\mathrm{diag}(v_i)\bigr|}{\max\bigl(\mathrm{diag}(v_r),\,\epsilon_0\bigr)},
-\label{eq:jbbox}
-\end{align}
-其中 $\epsilon_0$ 为防除零小正数。三项取最大值合成该分支上的单分支差异
+纯边集 Jaccard 对等值面轻微平移较敏感，故引入质心位移项 $d^{\mathrm{pos}}_\ell=\lVert c(v_r)-c(v_i)\rVert/\max(\mathrm{diag}(v_r),\epsilon_0)$ 和包围盒尺度变化项 $d^{\mathrm{bbox}}_\ell=|{\mathrm{diag}(v_r)-\mathrm{diag}(v_i)}|/\max(\mathrm{diag}(v_r),\epsilon_0)$ 作为几何补偿（$\epsilon_0$ 为防除零常数）。三项取最大值合成分支差异
 \begin{equation}
 d_\ell(v_r,v_i)=\max\bigl(d^{J}_\ell,\ \lambda_{p}\,d^{\mathrm{pos}}_\ell,\ \lambda_{b}\,d^{\mathrm{bbox}}_\ell\bigr),
 \label{eq:jaccard-combine}
 \end{equation}
-$\lambda_p,\lambda_b$ 为两个补偿项的相对权重。取最大值而非求和，使得边集重组、整体平移或尺度膨胀中任一通道发生显著变化都足以触发保留。
+其中 $\lambda_p,\lambda_b$ 为补偿项相对权重。取最大值而非求和，使得边集重组、整体平移或尺度膨胀中任一通道发生显著变化都足以触发保留。
 
 \subsubsection{局部活性子图的 GNN 向量化差异}
 \label{sec:gnn}
 
-边集 Jaccard 直接且可解释，但对网格离散化和轻微平移较敏感。第二种度量把同一活性子图编码成固定长度向量，在向量空间中比较结构相似性，将"边是否逐一重合"放松为"局部结构是否相似"。
+边集 Jaccard 直接且可解释，但对网格离散化和轻微平移较敏感。第二种度量将活性子图编码为固定长度向量后在向量空间中比较，将"边是否逐一重合"放松为"局部结构是否相似"。
 
-\paragraph{节点特征。}对每个活性顶点 $p$，构造 $11$ 维特征向量 $x_p$：第 $1$ 维为全局归一化标量 $(f(p)-f_{\min})/(f_{\max}-f_{\min})$；第 $2$、$3$ 维为相对阈值的有符号偏差 $(f(p)-t)$ 及其绝对值；第 $4$--$6$ 维为顶点相对子图质心的坐标（按包围盒对角线归一化）；第 $7$ 维为归一化顶点度数；第 $8$--$11$ 维为分割标签的多尺度正余弦编码。这些特征对全局平移和尺度保持不变。
-
-\paragraph{图编码。}以特征矩阵 $X\in\mathbb{R}^{|V_{\mathrm{act}}|\times 11}$ 和活性子图邻接为输入，使用两层图卷积网络（GCN）做对称归一化邻域聚合：
+对每个活性顶点 $p$ 构造 $11$ 维特征：归一化标量值、相对阈值偏差及其绝对值、相对质心坐标（$3$ 维，按包围盒归一化）、归一化度数、分割标签多尺度编码（$4$ 维）。以特征矩阵 $X\in\mathbb{R}^{|V_{\mathrm{act}}|\times 11}$ 和活性子图邻接为输入，两层图卷积网络做对称归一化聚合：
 \begin{equation}
-H^{(1)}=\operatorname{ReLU}\bigl(\hat{A}\,X\,W^{(1)}\bigr),\quad
-H^{(2)}=\operatorname{ReLU}\bigl(\hat{A}\,H^{(1)}\,W^{(2)}\bigr),
+H^{(l)}=\operatorname{ReLU}\bigl(\hat{A}\,H^{(l-1)}\,W^{(l)}\bigr),\quad l=1,2,
 \label{eq:gcn}
 \end{equation}
-其中 $\hat{A}=\tilde{D}^{-1/2}\tilde{A}\,\tilde{D}^{-1/2}$ 为加自环后的对称归一化邻接矩阵，$W^{(1)}\in\mathbb{R}^{11\times h}$、$W^{(2)}\in\mathbb{R}^{h\times h}$ 为 GCN 权重，$h$ 为隐藏维度。两层传播使每个顶点聚合其二跳邻域信息。随后对 $H^{(2)}$ 做排列不变的读出，拼接均值池化与最大值池化，并附加两个对数规模项以保留子图大小信息：
-\begin{equation}
-\begin{aligned}
-z_\ell(v)=\operatorname{normalize}\bigl[\,&\operatorname{mean}(H^{(2)})\,\big\|\,\operatorname{max}(H^{(2)})\,\big\|\\[-2pt]
-&\log(1{+}|V_{\mathrm{act}}|)\,\big\|\,\log(1{+}|E_{\mathrm{act}}|)\,\bigr],
-\end{aligned}
-\label{eq:readout}
-\end{equation}
-最终经 $L_2$ 归一化得到 $z_\ell(v)\in\mathbb{R}^{2h+2}$。本文默认采用确定性固定权重（He 初始化，固定随机种子），使方法无需标注数据即可运行。
-
-\paragraph{分支差异。}参考节点与候选节点在分支 $b_\ell$ 上的差异由余弦距离给出：
+其中 $H^{(0)}=X$，$\hat{A}=\tilde{D}^{-1/2}\tilde{A}\,\tilde{D}^{-1/2}$ 为加自环的对称归一化邻接矩阵。随后对 $H^{(2)}$ 做排列不变读出——拼接均值池化、最大值池化与两个对数规模项 $\log(1{+}|V_{\mathrm{act}}|)$、$\log(1{+}|E_{\mathrm{act}}|)$，经 $L_2$ 归一化得到向量 $z_\ell(v)\in\mathbb{R}^{2h+2}$（$h$ 为隐藏维度）。本文默认采用确定性固定权重（He 初始化），无需标注数据。参考节点与候选节点的分支差异由余弦距离给出：
 \begin{equation}
 d_\ell(v_r,v_i)=1-\cos\bigl(z_\ell(v_r),\,z_\ell(v_i)\bigr).
 \label{eq:gnndist}
 \end{equation}
-与 Jaccard 相比，向量化方法对轻微平移和少量边增删更鲁棒，但可解释性弱于显式边集比较。两种度量互为对照，依次从"显式边集"到"向量化结构"刻画分支差异。
+与 Jaccard 相比，向量化方法对轻微平移和少量边增删更鲁棒，但可解释性较弱。两种度量互为对照，从"显式边集"到"向量化结构"两个粒度刻画分支差异。
 
 % ========================================
-% 3.4 多分支感知贪心简化算法
+% 3.4 基于多分支加权的贪心简化算法
 % ========================================
-\subsection{多分支感知贪心简化算法}
+\subsection{基于多分支加权的贪心简化算法}
 \label{sec:greedy}
 
-基于前述三节定义的多分支权重（\ref{sec:branch-weight} 节）、亏格不变约束（\ref{sec:genus-interval} 节）和分支几何差异度量（\ref{sec:geo-repr} 节），本节给出完整的贪心简化算法。
+基于前述多分支权重（\ref{sec:branch-weight} 节）、亏格不变约束（\ref{sec:genus-interval} 节）和分支几何差异（\ref{sec:geo-repr} 节），本节给出完整的贪心简化算法。
 
-\paragraph{问题定义。}给定增广轮廓树 $T=(V,E,f)$ 和容差 $\varepsilon>0$，目标是寻找保留集合 $K\subseteq V$ 满足
-\begin{equation}
-V_s\subseteq K\subseteq V,
-\label{eq:keep-constraint}
-\end{equation}
-并且在每条拓扑分支 $b=(v_0,\ldots,v_k)$ 内，把 $K\cap b$ 按标量排序为序列 $v_0=u_0,u_1,\ldots,u_m=v_k$ 时，相邻保留节点之间的多分支加权差异受阈值控制：
-\begin{equation}
-D(u_{j-1},u_j)<\varepsilon,\quad j=1,\ldots,m.
-\label{eq:eps-cover}
-\end{equation}
-
-\paragraph{链上贪心策略。}对每条拓扑分支 $b=(v_0,\ldots,v_k)$ 独立执行。算法保留分支起点 $v_0$ 并令 $v_r\leftarrow v_0$，随后依次扫描中间候选节点 $v_i$：计算当前层级 $t_i=f(v_i)$ 的活跃分支集合 $\mathcal{B}(t_i)$，在每条活跃分支上分别计算 $d_\ell(v_r,v_i)$ 并按式~\eqref{eq:aggregate} 汇总为整体差异 $D(v_r,v_i)$；若
-\begin{equation}
-D(v_r,v_i)\geq \varepsilon,
-\end{equation}
-则保留 $v_i$ 并更新 $v_r\leftarrow v_i$，否则跳过；扫描结束后始终保留终点 $v_k$。这一策略不依赖全局优化，线性、可控，适合在增广轮廓树的多条分支上独立执行。
-
-\paragraph{简化树重建。}对全部分支完成保留节点判定后，根据保留集合 $K$ 合并被删除节点跨越的弧：新弧的标量跨度取两端保留节点之差，区域规模取被合并各弧之和。重建得到的简化树 $T'$ 与原树保持相同的根、叶和分支节点结构，是一棵合法的几何过滤增广轮廓树。
+给定增广轮廓树 $T=(V,E,f)$ 和容差 $\varepsilon>0$，目标是寻找保留集合 $K\subseteq V$，使 $V_s\subseteq K$（结构节点全部保留），且在每条分支 $b=(v_0,\ldots,v_k)$ 内，相邻保留节点之间的多分支加权差异满足 $D(u_{j-1},u_j)<\varepsilon$。算法对每条分支独立执行链上贪心：保留起点 $v_0$ 并令 $v_r\leftarrow v_0$，依次扫描中间候选节点 $v_i$，计算活跃分支集合 $\mathcal{B}(t_i)$ 上的加权差异 $D(v_r,v_i)$（式~\eqref{eq:aggregate}）；若 $D\geq\varepsilon$ 则保留 $v_i$ 并更新参考节点，否则跳过；扫描结束后始终保留终点 $v_k$。
 
 \begin{algorithm}[H]
-\caption{多分支感知贪心简化（总体框架）}
+\caption{基于多分支加权的贪心简化}
 \label{alg:framework}
 \begin{algorithmic}[1]
 \Require 增广轮廓树 $T=(V,E,f)$，容差 $\varepsilon$，混合系数 $\alpha$
@@ -319,7 +287,7 @@ D(v_r,v_i)\geq \varepsilon,
     \State $\mathcal{B}(t_i) \gets$ 式~\eqref{eq:active-branch} 确定的活跃分支集合
     \ForAll{$b_\ell \in \mathcal{B}(t_i)$}
       \State $d_\ell \gets \textsc{BranchDiff}(v_r,v_i,b_\ell)$ \Comment{式~\eqref{eq:jaccard-combine} 或 \eqref{eq:gnndist}}
-      \State 由式~\eqref{eq:wtopo}、\eqref{eq:wgeo}、\eqref{eq:wmix} 计算 $w_\ell$
+      \State 由式~\eqref{eq:weights}、\eqref{eq:wmix} 计算 $w_\ell$
     \EndFor
     \State $D \gets \sum_\ell w_\ell\, d_\ell$
     \If{$D \ge \varepsilon$}
@@ -332,7 +300,9 @@ D(v_r,v_i)\geq \varepsilon,
 \end{algorithmic}
 \end{algorithm}
 
-\paragraph{复杂度分析。}设增广轮廓树总节点数为 $|V|$、候选普通节点总数为 $|V_o|$、单个标量层级的活跃分支数为 $q$（通常远小于分支总数）。结构节点识别与分支分解复杂度为 $O(|V|)$。链上贪心对每个候选节点各处理一次，在至多 $q$ 个活跃分支上计算分支差异，总代价约为 $O(|V_o|\,q\,C(\bar{s}))$。其中 $C(\bar{s})$ 为单分支差异的计算代价：Jaccard 实例为 $O(\bar{s})$（边集交并运算），GNN 实例为 $O(\bar{s}\,h)$（两层 GCN 前向传播），$\bar{s}=|E_{\mathrm{act}}|$ 为活性边数、$h$ 为隐藏维度。参考节点的局部描述符可缓存复用，避免重复计算。
+全部分支完成保留判定后，合并被删节点跨越的弧（新弧标量跨度取两端保留节点之差、区域规模取被合并各弧之和），重建得到的 $T'$ 保持原树根、叶和分支节点结构，是一棵合法的几何过滤增广轮廓树。
+
+\paragraph{复杂度。}结构节点识别与分支分解为 $O(|V|)$。链上贪心对每个候选节点各处理一次，在至多 $q$ 个活跃分支上计算差异，总代价为 $O(|V_o|\,q\,C(\bar{s}))$，其中 $C(\bar{s})$ 为单分支差异代价：Jaccard 为 $O(\bar{s})$（边集交并），GNN 为 $O(\bar{s}\,h)$（两层前向传播），$\bar{s}$ 为平均活性边数、$h$ 为隐藏维度。参考节点描述符可缓存，避免重复计算。
 
 \clearpage
 \begin{thebibliography}{99}

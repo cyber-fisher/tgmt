@@ -1,0 +1,115 @@
+% 方法框架图：增广轮廓树 → 临界值分区 → 亏格不变区间
+% 由 ConnectivityMergeTree.tex 精简而来，供 main.tex \input 使用
+\begin{tikzpicture}[
+    y=0.45cm, x=1.6cm,
+    crit node/.style={circle, draw=black, fill=gray!20, thick, inner sep=0.5pt, minimum size=11pt, font=\sffamily\tiny},
+    reg node/.style={circle, draw=black, fill=white, inner sep=0pt, minimum size=8pt, font=\sffamily\tiny},
+    main edge/.style={very thick, draw=black!80},
+    axis/.style={line width=1.4pt, draw=black!85},
+    proj/.style={draw=black!35, dashed, line width=0.6pt, -{Stealth[length=1.6mm, width=1.2mm]}},
+    mapdot/.style={ellipse, fill=black!75, text=white, line width=0.8pt, inner sep=0.8pt,
+                   minimum width=14pt, minimum height=9pt, font=\sffamily\tiny\bfseries},
+    ilab/.style={font=\sffamily\tiny, text=black!80},
+    echi/.style={font=\sffamily\tiny, text=black!55, fill=white, inner sep=0.3pt},
+]
+
+% ===== 左部：增广轮廓树 =====
+\node[crit node] (C24) at (0, 24) {24};
+\node[crit node] (C22) at (1, 22) {22};
+\node[crit node] (C15) at (0.5, 15) {15};
+\node[crit node] (C13) at (2, 13) {13};
+\node[crit node] (C10) at (1, 10) {10};
+\node[crit node] (C8)  at (2, 8) {8};
+\node[crit node] (C1)  at (0, 1) {1};
+\node[crit node] (C0)  at (0.5, 0) {0};
+
+\draw[main edge] (C15) -- (C24);
+\foreach \v in {17, 18, 20, 23} \path (C15) -- (C24) node[pos={(\v-15)/(24-15)}, reg node] {\v};
+
+\draw[main edge] (C15) -- (C22);
+\foreach \v in {16, 19, 21} \path (C15) -- (C22) node[pos={(\v-15)/(22-15)}, reg node] {\v};
+
+\draw[main edge] (C1) -- (C15);
+\foreach \v in {3, 6, 7, 14} \path (C1) -- (C15) node[pos={(\v-1)/(15-1)}, reg node] {\v};
+
+\draw[main edge] (C10) -- (C15);
+\foreach \v in {11, 12} \path (C10) -- (C15) node[pos={(\v-10)/(15-10)}, reg node] {\v};
+
+\draw[main edge] (C10) -- (C13);
+\draw[main edge] (C8) -- (C10);
+
+\draw[main edge] (C0) -- (C10);
+\foreach \v in {2, 4, 5, 9} \path (C0) -- (C10) node[pos={(\v-0)/(10-0)}, reg node] {\v};
+
+% Euler 示性数标注
+\path (C0)  -- (C10) node[pos=0.68, echi] {$\chi{=}1$};
+\path (C1)  -- (C15) node[pos=0.88, echi] {$\chi{=}1$};
+\path (C10) -- (C15) node[pos=0.5,  echi] {$\chi{=}1$};
+\path (C15) -- (C22) node[pos=0.62, echi] {$\chi{=}1$};
+\path (C15) -- (C24) node[pos=0.62, echi] {$\chi{=}1$};
+
+% 左部标题
+\node[font=\sffamily\bfseries\scriptsize, text=black!70, align=center] at (1.0, 26)
+   {增广轮廓树};
+
+% ===== 中部：标量轴分区 =====
+% 区间色带
+\fill[blue!12]   (3.78,0)  rectangle (4.78,1);
+\fill[green!14]  (3.78,1)  rectangle (4.78,8);
+\fill[orange!20] (3.78,8)  rectangle (4.78,10);
+\fill[orange!20] (3.78,10) rectangle (4.78,13);
+\fill[green!14]  (3.78,13) rectangle (4.78,15);
+\fill[green!14]  (3.78,15) rectangle (4.78,22);
+\fill[blue!12]   (3.78,22) rectangle (4.78,24);
+\draw[black!30, line width=0.4pt] (3.78,0) rectangle (4.78,24);
+\foreach \v in {1,8,10,13,15,22}
+   \draw[black!30, line width=0.3pt] (3.78,\v) -- (4.78,\v);
+
+% 区间标注
+\node[ilab, align=center] at (4.28,0.5)  {$I_1$\,{\tiny$g{=}g_1$}};
+\node[ilab, align=center] at (4.28,4.5)  {$I_2$\,{\tiny$g{=}g_1{+}1$}};
+\node[ilab, align=center] at (4.28,9)    {$I_3$\,{\tiny$g{=}g_1{+}2$}};
+\node[ilab, align=center] at (4.28,11.5) {$I_4$\,{\tiny$g{=}g_1{+}2$}};
+\node[ilab, align=center] at (4.28,14)   {$I_5$\,{\tiny$g{=}g_1{+}1$}};
+\node[ilab, align=center] at (4.28,18.5) {$I_6$\,{\tiny$g{=}g_1{+}1$}};
+\node[ilab, align=center] at (4.28,23)   {$I_7$\,{\tiny$g{=}g_1$}};
+
+% 标量轴
+\draw[axis, -{Stealth[length=2.4mm, width=2mm]}] (3.6,-0.4) -- (3.6,25.2);
+\node[font=\sffamily\small\itshape, text=black!70] at (3.6,25.8) {$f$};
+
+% 投影虚线
+\draw[proj] (C24) -- (3.47,24);
+\draw[proj] (C22) -- (3.47,22);
+\draw[proj] (C15) -- (3.47,15);
+\draw[proj] (C13) -- (3.47,13);
+\draw[proj] (C10) -- (3.47,10);
+\draw[proj] (C8)  -- (3.47,8);
+\draw[proj] (C1)  -- (3.47,1);
+\draw[proj] (C0)  -- (3.47,0);
+
+% 轴上临界点标记
+\node[mapdot, draw=blue!55!black]  at (3.6,0)  {0};
+\node[mapdot, draw=blue!55!black]  at (3.6,1)  {1};
+\node[mapdot, draw=blue!55!black]  at (3.6,8)  {8};
+\node[mapdot, draw=green!45!black] at (3.6,10) {10};
+\node[mapdot, draw=red!70!black]   at (3.6,13) {13};
+\node[mapdot, draw=green!45!black] at (3.6,15) {15};
+\node[mapdot, draw=red!70!black]   at (3.6,22) {22};
+\node[mapdot, draw=red!70!black]   at (3.6,24) {24};
+
+% 中部标题
+\node[font=\sffamily\bfseries\scriptsize, text=black!70, align=center] at (4.2,26)
+   {亏格不变区间};
+
+% ===== 图例 =====
+\node[anchor=north, font=\sffamily\tiny, text=black!70, align=center] at (2.8,-1.5) {%
+  \textcolor{blue!55!black}{$\bullet$}~极小值（分量出生）\quad
+  \textcolor{green!45!black}{$\bullet$}~鞍点（合并/分裂）\quad
+  \textcolor{red!70!black}{$\bullet$}~极大值（分量消亡）\\[2pt]
+  区间颜色：\tikz[baseline=-0.4ex]\fill[blue!12](0,0)rectangle(0.3,0.18);~$c{=}1$\quad
+  \tikz[baseline=-0.4ex]\fill[green!14](0,0)rectangle(0.3,0.18);~$c{=}2$\quad
+  \tikz[baseline=-0.4ex]\fill[orange!20](0,0)rectangle(0.3,0.18);~$c{=}3$
+};
+
+\end{tikzpicture}
