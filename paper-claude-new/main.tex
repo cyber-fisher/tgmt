@@ -97,7 +97,7 @@
 
 等值面是流场可视化分析中的重要工具，选择有代表性的等值面对于刻画流场特征具有重要意义。一张等值面是否具有代表性，可从三个方面衡量。其一是等值面的位置与分布：代表性的等值面应覆盖标量场中不同的空间区域与阈值层级，避免集中于单一区间而遗漏其他特征区域。其二是等值面的连通性以及亏格变化：如 \ref{sec:background} 节所述，连通分量的出生、合并、分裂、消亡以及亏格的增减都被编码在轮廓树的极值点与鞍点上，代表性的等值面序列应完整覆盖这些拓扑事件。其三是等值面的几何特征：即便拓扑不变，等值面的形状、规模与截穿的局部结构仍可能明显演化，代表性应捕捉这类几何差异。前两个方面主要与拓扑分析和简化相关，其代表工作是轮廓树、合并树以及 Carr 等的柔性等值面框架；\cite{carr_contour_2003,carr_flexible_2010,gueunet_act_2019} 第三个方面主要与 ISM 等几何方法相关。\cite{bruckner_ism_2010} 然而如 \ref{sec:related} 节所述，拓扑方法能保住连通性与亏格变化点却难以刻画分支内几何演化，几何方法能度量形状差异却常脱离轮廓树分支、混合多分支变化，现有研究因而并不能真正选出有代表性的等值面，也没有方法同时针对上述三个方面。
 
-本文正是为弥合这一空缺而提出。我们把”选择代表性等值面”具体化为增广轮廓树上的节点筛选问题：为在连续阈值上保留代表性的等值状态，增广轮廓树在临界节点之间插入大量普通节点，\cite{gueunet_act_2019,gueunet_forests_2016,li_distributed_2024} 但相邻普通节点对应的等值结构往往高度相似，造成冗余——保留全部普通节点会产生近似重复的等值面并增加存储与交互成本，而不加区分地删除又会丢失真实的几何演化。本文在严格保留关键拓扑结构（根、叶、鞍点与分支节点，即连通性与亏格变化的临界点，见 \ref{sec:background} 节）的前提下，沿拓扑分支筛选出几何上有代表性的普通节点，从而在位置分布、连通性与亏格、几何特征三个层面同时逼近原始等值面序列。
+本文正是为弥合这一空缺而提出。我们把”选择代表性等值面”具体化为增广轮廓树上的节点筛选问题：为在连续阈值上保留代表性的等值状态，增广轮廓树在临界节点之间插入大量普通节点，\cite{gueunet_act_2019,lukasczyk_extreem_2023,li_distributed_2024} 但相邻普通节点对应的等值结构往往高度相似，造成冗余——保留全部普通节点会产生近似重复的等值面并增加存储与交互成本，而不加区分地删除又会丢失真实的几何演化。本文在严格保留关键拓扑结构（根、叶、鞍点与分支节点，即连通性与亏格变化的临界点，见 \ref{sec:background} 节）的前提下，沿拓扑分支筛选出几何上有代表性的普通节点，从而在位置分布、连通性与亏格、几何特征三个层面同时逼近原始等值面序列。
 
 这一目标落实为三项设计。其一，简化范围受拓扑约束：结构节点全部保留，候选普通节点沿所属拓扑分支顺序筛选，简化后通过合并原始弧重建合法树，从而保住连通性与亏格变化所依附的结构节点。其二，基础差异度量按分支实例化：本文统一以原始网格上的局部活性子图刻画分支局部结构，并给出两种可替换的比较方式——活性边集合的 Jaccard 距离与活性子图的 GNN 向量化距离，分别从显式边集与向量化结构两个角度度量几何差异。其三，多分支场景下按重要性加权：一个标量层级可能同时穿过主分支与旁支，本文保留这些分支身份，并按标量跨度型拓扑显著性与几何规模把多个分支的差异汇总为整体差异。据此，本文提出一个拓扑保持的多分支感知增广轮廓树节点简化框架。
 
@@ -106,11 +106,11 @@
 
 围绕等值面表示与轮廓树简化的已有工作可从三个方面梳理：拓扑驱动的合并树与轮廓树简化方法、几何驱动的等值面相似性度量方法，以及面向网格数据的图表示学习方法。
 
-Van Kreveld 等最早将轮廓树引入等值面遍历，以其变体构造可证明规模最小的种子集从连通分量中精确提取等值面。\cite{van_kreveld_1997} Carr 等提出通过合并 Join 树与 Split 树的通用维度轮廓树算法，成为轮廓树计算的标准参考实现。\cite{carr_contour_2003} Edelsbrunner 等引入持久同调，以特征在过滤中的存活时间区分信号与噪声，奠定多尺度拓扑简化的理论基础。\cite{edelsbrunner_persistence_2002} Carr 等为轮廓树分支引入面积、体积以及兼顾空间规模与函数值偏离的超体积等局部几何度量，作为分支剪枝的代价函数。\cite{carr_geometric_2004} 在此基础上，Carr 等提出柔性等值面框架，以轮廓树超级弧索引独立 contour，并结合叶子剪枝与顶点归约实现交互式简化与显示，是本文最直接的相关工作。\cite{carr_flexible_2010} 面向并行计算，Gueunet 等提出值域分割的多线程轮廓森林算法，首次实现共享内存并行的增广轮廓树计算；\cite{gueunet_forests_2016}其后又提出基于 Fibonacci 堆的任务并行增广轮廓树算法，是本文简化工作的直接操作对象。\cite{gueunet_act_2019} Tierny 等开发 Topology ToolKit（TTK），为合并树、轮廓树、Morse-Smale 复形等拓扑结构提供开源标准实现。\cite{tierny_ttk_2018} Lukasczyk 等提出局部化拓扑简化，仅在含未选极值的子体上并行展平，显著提升交互式参数探索的响应速度。\cite{lukasczyk_2020} Li 等进一步将增广、超扫掠与分支分解扩展到分布式环境，使分布式轮廓树可作为科学探索的查询结构。\cite{li_distributed_2024}
+Van Kreveld 等最早将轮廓树引入等值面遍历，以其变体构造可证明规模最小的种子集从连通分量中精确提取等值面。\cite{van_kreveld_1997} Carr 等提出通过合并 Join 树与 Split 树的通用维度轮廓树算法，成为轮廓树计算的标准参考实现。\cite{carr_contour_2003} Edelsbrunner 等引入持久同调，以特征在过滤中的存活时间区分信号与噪声，奠定多尺度拓扑简化的理论基础。\cite{edelsbrunner_persistence_2002} Carr 等为轮廓树分支引入面积、体积以及兼顾空间规模与函数值偏离的超体积等局部几何度量，作为分支剪枝的代价函数；\cite{carr_geometric_2004} 在此基础上又提出柔性等值面框架，以轮廓树超级弧索引独立 contour，并结合叶子剪枝与顶点归约实现交互式简化与显示，是本文最直接的相关工作。\cite{carr_flexible_2010} 面向并行计算，Gueunet 等提出基于 Fibonacci 堆的任务并行增广轮廓树算法，是本文简化工作的直接操作对象；\cite{gueunet_act_2019} Lukasczyk 等以极值图为骨架提出 ExTreeM，进一步降低增广合并树并行计算的串行开销。\cite{lukasczyk_extreem_2023} Tierny 等开发 Topology ToolKit（TTK），为合并树、轮廓树、Morse-Smale 复形等拓扑结构提供开源标准实现。\cite{tierny_ttk_2018} 在分布式与大规模场景下，Li 等先将增广、超扫掠与分支分解扩展到分布式环境，使分布式轮廓树可作为科学探索的查询结构，\cite{li_distributed_2024} 后进一步引入预简化策略，在数百亿网格元素上完成层次化轮廓树的构造。\cite{li_presimplification_2025} 在合并树相似性度量方向，Sridharamurthy 与 Natarajan 提出局部树编辑距离，把整树比较推进到子结构级；\cite{sridharamurthy_local_2021} Wetzels 等把 Wasserstein 测地线/重心与路径映射编辑距离结合，得到分支分解无关的鲁棒度量；\cite{wetzels_path_2023} Pont 与 Garth 进一步引入区域感知 Wasserstein 距离，把极值对齐区域的取值分布显式纳入度量。\cite{pont_region_2025} 这些方法与本文均以"分支/子结构 + 几何信息"为共同切面，但仍以手工设计的持久性/几何权重作为过滤依据，缺少对局部几何结构本身的表达能力。
 
-Bajaj 等提出等值面谱（contour spectrum），将等值面面积、体积、梯度积分等属性表达为等值的分段 B 样条函数，首次将几何量化方法引入等值面阈值选择。\cite{bajaj_spectrum_1997} Fujishiro 等以标量场临界点分析驱动体绘制传递函数自动设计，是拓扑驱动传递函数路线的开创性工作。\cite{fujishiro_1999} Chiang 与 Lu 提出保持所有可能等值面拓扑的渐进四面体网格简化算法，是拓扑感知网格简化的关键先驱。\cite{chiang_lu_2003} Takahashi 等提取体骨架树（VST），以包含层级与轨道距离等拓扑属性自动设计多维传递函数。\cite{takahashi_2004} Weber 等基于轮廓树分支分解将体数据分割为拓扑一致的区域，为每个分支独立指派传递函数，实现拓扑感知的选择性体绘制。\cite{weber_2007} Bruckner 与 Möller 提出等值面相似性图（ISM），以归一化互信息比较不同阈值下的距离场结构，从相似度矩阵中选出代表性等值面，是等值面几何相似性度量的里程碑。\cite{bruckner_ism_2010} Fofonov 与 Linsen 利用准蒙特卡洛采样近似距离场分布，显著降低 ISM 的计算代价。\cite{fofonov_2014} Fernandes 等以最小费用流与 Hausdorff 距离的插值方法选取代表性等值面，可捕捉拓扑不变时仍存在的几何形变。\cite{fernandes_2016} Tao 等将 ISM 扩展为矩阵形式，同时组织自、时间、变量三类相似图，支持时变多变量体数据的跨变量与跨时间步比较。\cite{tao_2019} Wang 提出基于区间体与等值面面积的 VOA 度量以及基于点距的分割度量，用于自动检测代表性等值与语义化等值面分割。\cite{wang_isomeasure_2020}
+Bajaj 等提出等值面谱（contour spectrum），将等值面面积、体积、梯度积分等属性表达为等值的分段 B 样条函数，首次将几何量化方法引入等值面阈值选择。\cite{bajaj_spectrum_1997} Chiang 与 Lu 提出保持所有可能等值面拓扑的渐进四面体网格简化算法，是拓扑感知网格简化的关键先驱。\cite{chiang_lu_2003} Bruckner 与 Möller 提出等值面相似性图（ISM），以归一化互信息比较不同阈值下的距离场结构，从相似度矩阵中选出代表性等值面，是等值面几何相似性度量的里程碑；\cite{bruckner_ism_2010} 但 ISM 将多个连通分支的变化混合到同一距离场描述符中，难以区分分支级别的几何差异。Wang 提出基于区间体与等值面面积的 VOA 度量以及基于点距的分割度量，用于自动检测代表性等值与语义化等值面分割。\cite{wang_isomeasure_2020} 在此基础上，Li 等将 ISM 扩展到多视图场景，通过跨视图一致的相似性聚类同时驱动传递函数设计与代表性等值面选择；\cite{li_multiview_ism_2025} Zhou 等面向气象集合数据，以 contour probability similarity 做非均匀下采样得到 key-isovalue，并结合信息损失曲线自动决定采样密度。\cite{zhou_keyisovalue_2025} 深度表征方面，Dai 等提出 IsoExplorer，用 Octree 卷积变分自编码器学习每张连通等值面的潜表示，把等值面相似性从"距离场互信息"迁移到"神经嵌入距离"；\cite{dai_isoexplorer_2021} He 等则提出 ScalarGCN，把标量值作为图节点用 GCN 学习关联表征，是把 GCN 系统性引入体数据分析的先驱之一。\cite{he_scalargcn_2021} Li 与 Shen 借助不确定度传播，把隐式神经表示上的等值面提取显著加速，代表神经场表征下的等值面几何提取方向。\cite{li_shen_inr_2024} 上述工作展示了 ISM 家族从"手工描述子"迈向"多视图/集合/神经表征"的演化，但共同短板是脱离轮廓树的分支结构，几何差异被混合在多分支之间。
 
-Kipf 与 Welling 提出图卷积网络（GCN），通过对称归一化的一阶邻域聚合实现高效的半监督节点分类，是图神经网络最具影响力的基石模型。\cite{kipf_gcn_2017} Hamilton 等提出 GraphSAGE，以邻域采样与可学习聚合器实现大规模图上的归纳式表示学习，可为新节点生成 embedding。\cite{hamilton_graphsage_2017} Gilmer 等提出消息传递神经网络（MPNN）通用框架，将多种 GNN 变体统一到消息、更新与读出三阶段范式下。\cite{gilmer_mpnn_2017} Qi 等提出 PointNet，以对称最大池化直接在无序点云上学习置换不变特征，其处理无序集合的思路对网格学习具有重要启示。\cite{qi_pointnet_2017} Battaglia 等系统综述图网络中的关系归纳偏置，提出统一的图网络（GN）框架并将 CNN、RNN 归为其特例。\cite{battaglia_relational_2018} Verma 等提出 FeaStNet，从学习到的特征动态计算滤波权重与图邻域的软对应关系，用于三维形状分析。\cite{verma_feastnet_2018} Hanocka 等提出 MeshCNN，在三角网格的边上定义卷积与池化操作，以任务驱动的边折叠在保持拓扑的同时实现网格分辨率降低。\cite{hanocka_meshcnn_2019} Xu 等从理论上刻画消息传递 GNN 的判别能力上界，提出可达 Weisfeiler-Leman 测试上界的图同构网络（GIN）。\cite{xu_gin_2019} Pfaff 等提出 MeshGraphNet，以编码-处理-解码架构在非结构化网格上直接学习物理模拟，是网格 GNN 物理建模的标准范式。\cite{pfaff_meshgraphnet_2021} Sharp 等提出 DiffusionNet，以基于 Laplace-Beltrami 算子的学习扩散层实现对分辨率与采样变化自动鲁棒的表面学习，可跨 mesh 与点云表示。\cite{sharp_diffusionnet_2022}
+Kipf 与 Welling 提出图卷积网络（GCN），通过对称归一化的一阶邻域聚合实现高效的半监督节点分类，是图神经网络最具影响力的基石模型。\cite{kipf_gcn_2017} Hamilton 等提出 GraphSAGE，以邻域采样与可学习聚合器实现大规模图上的归纳式表示学习，可为新节点生成 embedding。\cite{hamilton_graphsage_2017} Gilmer 等提出消息传递神经网络（MPNN）通用框架，将多种 GNN 变体统一到消息、更新与读出三阶段范式下。\cite{gilmer_mpnn_2017} Xu 等从理论上刻画消息传递 GNN 的判别能力上界，提出可达 Weisfeiler-Leman 测试上界的图同构网络（GIN）。\cite{xu_gin_2019} 在此基础上，Rampasek 等提出 GraphGPS 通用框架，把 GT 拆解为位置/结构编码、局部消息传递与全局注意力三部分，实现线性复杂度的图 Transformer；\cite{rampasek_gps_2022} Bar-Shalom 等提出 Subgraphormer，通过图积视角把子图 GNN 与 Graph Transformer 统一，为"选取子图 + GNN 编码"这一范式提供理论表达力支撑。\cite{barshalom_subgraphormer_2024} 面向网格与曲面，Hanocka 等提出 MeshCNN，在三角网格的边上定义卷积与池化操作，以任务驱动的边折叠在保持拓扑的同时实现网格分辨率降低；\cite{hanocka_meshcnn_2019} Sharp 等提出 DiffusionNet，以基于 Laplace-Beltrami 算子的学习扩散层实现对分辨率与采样变化自动鲁棒的表面学习。\cite{sharp_diffusionnet_2022} 面向物理仿真，Pfaff 等提出 MeshGraphNet，以编码-处理-解码架构在非结构化网格上直接学习模拟；\cite{pfaff_meshgraphnet_2021} Nabian 等进一步在图分区与多尺度图上扩展该框架，实现工业级几何上的可扩展学习。\cite{nabian_xmesh_2024} 在图度量学习方向，Jain 等提出 GRAPHEDX，用神经集散度学习通用代价下的图编辑距离，代表当前"用神经网络学习图相似度"的最新水平。\cite{jain_graphedx_2024} 与本文最直接同构的工作是 Qin 等提出的合并树神经网络（MTNN），首次系统地用 GNN 学习整棵合并树的相似度嵌入，将拓扑比较速度提升两个数量级。\cite{qin_mtnn_2024} 但 MTNN 学习的是"整棵合并树"的相似度嵌入用于比较任务，而本文用 GNN 学习"分支级活性子图"的向量化用于增广轮廓树的几何过滤，输入图结构、监督信号与下游任务均不同，两者是"GNN + 拓扑抽象"方向的两个互补切面。
 
 综上，拓扑方法能保住连通性与亏格变化点却难以刻画分支内几何演化，几何方法能度量形状差异却脱离轮廓树分支结构，图表示学习提供了局部结构编码的工具但尚未应用于等值面代表性筛选。三者尚未在同一框架内统一，这一空缺正是本文工作的出发点。
 
@@ -166,30 +166,45 @@ H. Carr, J. Snoeyink, and M. van de Panne.
 Flexible isosurfaces: Simplifying and displaying scalar topology using the contour tree.
 \textit{Computational Geometry}, 43(1):42--58, 2010.
 
-\bibitem{gueunet_forests_2016}
-C. Gueunet, P. Fortin, J. Jomier, and J. Tierny.
-Contour forests: Fast multi-threaded augmented contour trees.
-\textit{IEEE Symposium on Large Data Analysis and Visualization (LDAV)}, pages 85--92, 2016.
-
 \bibitem{gueunet_act_2019}
 C. Gueunet, P. Fortin, J. Jomier, and J. Tierny.
 Task-based augmented contour trees with Fibonacci heaps.
 \textit{IEEE Transactions on Parallel and Distributed Systems}, 30(8):1889--1905, 2019.
+
+\bibitem{lukasczyk_extreem_2023}
+J. Lukasczyk, M. Will, F. Wetzels, G. H. Weber, and C. Garth.
+ExTreeM: Scalable augmented merge tree computation via extremum graphs.
+\textit{IEEE Transactions on Visualization and Computer Graphics}, 2023.
 
 \bibitem{tierny_ttk_2018}
 J. Tierny, G. Favelier, J. A. Levine, C. Gueunet, and M. Michaux.
 The Topology ToolKit.
 \textit{IEEE Transactions on Visualization and Computer Graphics}, 24(1):832--842, 2018.
 
-\bibitem{lukasczyk_2020}
-J. Lukasczyk, C. Garth, R. Maciejewski, and J. Tierny.
-Localized topological simplification of scalar data.
-\textit{IEEE Transactions on Visualization and Computer Graphics}, 27(2):572--582, 2020.
-
 \bibitem{li_distributed_2024}
 M. Li, H. Carr, O. R\"ubel, B. Wang, and G. H. Weber.
 Distributed augmentation, hypersweeps, and branch decomposition of contour trees for scientific exploration.
 \textit{IEEE Transactions on Visualization and Computer Graphics}, 2024.
+
+\bibitem{li_presimplification_2025}
+M. Li, H. Carr, O. R\"ubel, B. Wang, and G. H. Weber.
+Extremely scalable distributed computation of contour trees via pre-simplification.
+\textit{IEEE Symposium on Large Data Analysis and Visualization (LDAV)}, 2025.
+
+\bibitem{sridharamurthy_local_2021}
+R. Sridharamurthy and V. Natarajan.
+Comparative analysis of merge trees using local tree edit distance.
+\textit{IEEE Transactions on Visualization and Computer Graphics}, 29(2):1518--1530, 2023.
+
+\bibitem{wetzels_path_2023}
+F. Wetzels, M. Pont, J. Tierny, and C. Garth.
+Merge tree geodesics and barycenters with path mappings.
+\textit{IEEE Transactions on Visualization and Computer Graphics}, 2023.
+
+\bibitem{pont_region_2025}
+M. Pont and C. Garth.
+Region-aware Wasserstein distances of persistence diagrams and merge trees.
+\textit{IEEE Transactions on Visualization and Computer Graphics}, 2025.
 
 % === 2.2.2 等值面几何简化 ===
 
@@ -198,50 +213,45 @@ C. L. Bajaj, V. Pascucci, and D. R. Schikore.
 The contour spectrum.
 \textit{IEEE Visualization}, pages 167--174, 1997.
 
-\bibitem{fujishiro_1999}
-I. Fujishiro, T. Azuma, and Y. Takeshima.
-Automating transfer function design for comprehensible volume rendering based on 3D field topology analysis.
-\textit{IEEE Visualization}, pages 467--470, 1999.
-
 \bibitem{chiang_lu_2003}
 Y.-J. Chiang and X. Lu.
 Progressive simplification of tetrahedral meshes preserving all isosurface topologies.
 \textit{Computer Graphics Forum}, 22(3):493--504, 2003.
-
-\bibitem{takahashi_2004}
-S. Takahashi, Y. Takeshima, and I. Fujishiro.
-Topological volume skeletonization and its application to transfer function design.
-\textit{Graphical Models}, 66(1):24--49, 2004.
-
-\bibitem{weber_2007}
-G. H. Weber, S. E. Dillard, H. Carr, V. Pascucci, and B. Hamann.
-Topology-controlled volume rendering.
-\textit{IEEE Transactions on Visualization and Computer Graphics}, 13(2):330--341, 2007.
 
 \bibitem{bruckner_ism_2010}
 S. Bruckner and T. M\"oller.
 Isosurface similarity maps.
 \textit{Computer Graphics Forum}, 29(3):773--782, 2010.
 
-\bibitem{fofonov_2014}
-A. Fofonov and L. Linsen.
-Fast and robust isosurface similarity maps extraction using quasi-Monte Carlo approach.
-\textit{European Conference on Data Analysis (ECDA)}, 2014.
-
-\bibitem{fernandes_2016}
-D. Fernandes, S. Frey, and T. Ertl.
-Interpolation-based extraction of representative isosurfaces.
-\textit{International Symposium on Visual Computing (ISVC)}, LNCS, 2016.
-
-\bibitem{tao_2019}
-J. Tao, E. Imre, C. Wang, N. V. Chawla, H. Guo, G. Sever, and S.-H. Kim.
-Exploring time-varying multivariate volume data using matrix of isosurface similarity maps.
-\textit{IEEE Transactions on Visualization and Computer Graphics}, 25(1):1236--1245, 2019.
-
 \bibitem{wang_isomeasure_2020}
 Z. Wang.
 Representative isovalue detection and isosurface segmentation using novel isosurface measures.
 \textit{Computer Graphics Forum}, 39(3):37--47, 2020.
+
+\bibitem{dai_isoexplorer_2021}
+H. Dai, Y. Tao, X. He, and H. Lin.
+IsoExplorer: An isosurface-driven framework for 3D shape analysis of biomedical volume data.
+\textit{Journal of Visualization}, 2021.
+
+\bibitem{he_scalargcn_2021}
+X. He, Y. Tao, S. Yang, C. Chen, and H. Lin.
+ScalarGCN: Scalar-value association analysis of volumes based on graph convolutional network.
+\textit{Journal of Visualization}, 2021.
+
+\bibitem{li_shen_inr_2024}
+H. Li and H.-W. Shen.
+Improving efficiency of iso-surface extraction on implicit neural representations using uncertainty propagation.
+\textit{IEEE Transactions on Visualization and Computer Graphics}, 2024.
+
+\bibitem{li_multiview_ism_2025}
+P. Li, C. Chen, F. Wang, X. Zhang, and Y. Wang.
+Multi-view isosurface similarity analysis for transfer function design in direct volume rendering.
+\textit{Computers \& Graphics}, 2025.
+
+\bibitem{zhou_keyisovalue_2025}
+F. Zhou, H. Hu, F. Wang, J. Zhu, and W. Gao.
+Key-isovalue selection and hierarchical exploration visualization of weather forecast ensembles.
+\textit{Visual Informatics}, 2025.
 
 % === 2.2.3 图表示学习 ===
 
@@ -260,40 +270,50 @@ J. Gilmer, S. S. Schoenholz, P. F. Riley, O. Vinyals, and G. E. Dahl.
 Neural message passing for quantum chemistry.
 \textit{International Conference on Machine Learning}, pages 1263--1272, 2017.
 
-\bibitem{qi_pointnet_2017}
-C. R. Qi, H. Su, K. Mo, and L. J. Guibas.
-PointNet: Deep learning on point sets for 3D classification and segmentation.
-\textit{IEEE Conference on Computer Vision and Pattern Recognition}, pages 652--660, 2017.
+\bibitem{xu_gin_2019}
+K. Xu, W. Hu, J. Leskovec, and S. Jegelka.
+How powerful are graph neural networks?
+\textit{International Conference on Learning Representations}, 2019.
 
-\bibitem{battaglia_relational_2018}
-P. W. Battaglia, J. B. Hamrick, V. Bapst, A. Sanchez-Gonzalez, et~al.
-Relational inductive biases, deep learning, and graph networks.
-\textit{arXiv preprint arXiv:1806.01261}, 2018.
+\bibitem{rampasek_gps_2022}
+L. Rampasek, M. Galkin, V. P. Dwivedi, A. T. Luu, G. Wolf, and D. Beaini.
+Recipe for a general, powerful, scalable graph transformer.
+\textit{Advances in Neural Information Processing Systems}, 35, 2022.
 
-\bibitem{verma_feastnet_2018}
-N. Verma, E. Boyer, and J. Verbeek.
-FeaStNet: Feature-steered graph convolutions for 3D shape analysis.
-\textit{IEEE Conference on Computer Vision and Pattern Recognition}, pages 2598--2606, 2018.
+\bibitem{barshalom_subgraphormer_2024}
+G. Bar-Shalom, B. Bevilacqua, and H. Maron.
+Subgraphormer: Unifying subgraph GNNs and graph transformers via graph products.
+\textit{International Conference on Machine Learning}, 2024.
 
 \bibitem{hanocka_meshcnn_2019}
 R. Hanocka, A. Hertz, N. Fish, R. Giryes, S. Fleishman, and D. Cohen-Or.
 MeshCNN: A network with an edge.
 \textit{ACM Transactions on Graphics}, 38(4):90:1--90:12, 2019.
 
-\bibitem{xu_gin_2019}
-K. Xu, W. Hu, J. Leskovec, and S. Jegelka.
-How powerful are graph neural networks?
-\textit{International Conference on Learning Representations}, 2019.
+\bibitem{sharp_diffusionnet_2022}
+N. Sharp, S. Attaiki, K. Crane, and M. Ovsjanikov.
+DiffusionNet: Discretization agnostic learning on surfaces.
+\textit{ACM Transactions on Graphics}, 41(3):27:1--27:16, 2022.
 
 \bibitem{pfaff_meshgraphnet_2021}
 T. Pfaff, M. Fortunato, A. Sanchez-Gonzalez, and P. W. Battaglia.
 Learning mesh-based simulation with graph networks.
 \textit{International Conference on Learning Representations}, 2021.
 
-\bibitem{sharp_diffusionnet_2022}
-N. Sharp, S. Attaiki, K. Crane, and M. Ovsjanikov.
-DiffusionNet: Discretization agnostic learning on surfaces.
-\textit{ACM Transactions on Graphics}, 41(3):27:1--27:16, 2022.
+\bibitem{nabian_xmesh_2024}
+M. A. Nabian, C. Liu, R. Ranade, and S. Choudhry.
+X-MeshGraphNet: Scalable multi-scale graph neural networks for physics simulation.
+\textit{arXiv preprint arXiv:2411.17164}, 2024.
+
+\bibitem{jain_graphedx_2024}
+E. Jain, I. Roy, S. Meher, S. Chakrabarti, and A. De.
+Graph edit distance with general costs using neural set divergence.
+\textit{Advances in Neural Information Processing Systems}, 37, 2024.
+
+\bibitem{qin_mtnn_2024}
+Y. Qin, B. T. Fasy, C. Wenk, and B. Summa.
+Rapid and precise topological comparison with merge tree neural networks.
+\textit{IEEE Transactions on Visualization and Computer Graphics}, 2024.
 
 \end{thebibliography}
 
