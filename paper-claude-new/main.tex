@@ -96,39 +96,35 @@
 \begin{figure*}[t]
 \centering
 \begin{tikzpicture}[
-    node distance=0.6cm and 0.4cm,
+    node distance=0.6cm and 0.5cm,
     box/.style={rectangle, draw=black!70, fill=blue!6, thick, rounded corners=3pt,
-                minimum height=0.9cm, minimum width=2.2cm, align=center,
+                minimum height=0.9cm, minimum width=2.4cm, align=center,
                 font=\small\sffamily},
     arrow/.style={-{Stealth[length=2mm, width=1.8mm]}, thick, draw=black!70},
     label/.style={font=\tiny\sffamily, text=black!60, align=center},
 ]
 % 主流程节点
 \node[box] (input) {输入\\[-1pt]{\tiny 标量场 $f$ + 增广轮廓树 $T$}};
-\node[box, right=of input] (branch) {拓扑分支分解\\[-1pt]{\tiny 识别结构节点, 分解分支}};
-\node[box, right=of branch] (weight) {多分支权重\\[-1pt]{\tiny 拓扑权重 + 几何规模权重}};
-\node[box, right=of weight] (geo) {几何差异度量\\[-1pt]{\tiny Jaccard / GNN 向量化}};
+\node[box, right=of input] (weight) {多分支权重\\[-1pt]{\tiny 持久性权重 + 规模权重}};
+\node[box, right=of weight] (genus) {亏格不变区间\\[-1pt]{\tiny 分支内拓扑不变保证}};
+\node[box, right=of genus] (geo) {几何差异度量\\[-1pt]{\tiny Jaccard / GNN 向量化}};
 \node[box, right=of geo] (greedy) {贪心简化\\[-1pt]{\tiny 链上扫描, 阈值判定}};
-\node[box, right=of greedy] (output) {输出\\[-1pt]{\tiny 几何过滤增广轮廓树 $T'$}};
+\node[box, right=of greedy] (output) {输出\\[-1pt]{\tiny 简化树 $T'$}};
 
 % 箭头
-\draw[arrow] (input) -- (branch);
-\draw[arrow] (branch) -- (weight);
-\draw[arrow] (weight) -- (geo);
+\draw[arrow] (input) -- (weight);
+\draw[arrow] (weight) -- (genus);
+\draw[arrow] (genus) -- (geo);
 \draw[arrow] (geo) -- (greedy);
 \draw[arrow] (greedy) -- (output);
 
 % 节标注
-\node[label, above=0.15cm of branch] {\S\ref{sec:branch-weight}};
 \node[label, above=0.15cm of weight] {\S\ref{sec:branch-weight}};
+\node[label, above=0.15cm of genus] {\S\ref{sec:genus-interval}};
 \node[label, above=0.15cm of geo] {\S\ref{sec:geo-repr}};
 \node[label, above=0.15cm of greedy] {\S\ref{sec:greedy}};
-
-% 亏格不变约束标注
-\node[label, below=0.2cm of weight] {亏格不变区间约束 (\S\ref{sec:genus-interval})};
-\draw[dashed, thin, black!40] (weight.south) -- ++(0,-0.15);
 \end{tikzpicture}
-\caption{方法流程图。输入标量场与增广轮廓树，经拓扑分支分解、多分支权重计算、分支几何差异度量，最终通过贪心简化算法输出几何过滤增广轮廓树。}
+\caption{方法流程图。输入标量场与增广轮廓树，经多分支权重计算、亏格不变区间约束、分支几何差异度量，最终通过贪心简化算法输出几何过滤增广轮廓树。}
 \label{fig:pipeline}
 \end{figure*}
 
@@ -155,46 +151,50 @@ Kipf 与 Welling 提出图卷积网络（GCN），通过对称归一化的一阶
 综上，拓扑方法能保住连通性与亏格变化点却难以刻画分支内几何演化，几何方法能度量形状差异却脱离轮廓树分支结构，图表示学习提供了局部结构编码的工具但尚未应用于等值面代表性筛选。三者尚未在同一框架内统一，这一空缺正是本文工作的出发点。
 \section{方法}
 
-本节给出基于几何过滤的增广轮廓树节点简化方法。输入为规则网格 $\Omega$ 上的标量场 $f:\Omega\rightarrow\mathbb{R}$ 及其增广轮廓树 $T=(V,E,f)$，输出为几何过滤增广轮廓树 $T'$——在严格保留连通性与亏格变化临界点的前提下，沿拓扑分支筛选出几何上有代表性的普通节点后重建而得的简化树。图~\ref{fig:framework} 给出了核心概念的直观示意：增广轮廓树的临界点将标量轴划分为若干亏格不变区间，每条拓扑分支对应一个区间，分支内部等值面拓扑不变、仅有几何演化。图~\ref{fig:pipeline} 给出方法的整体流程。全文按以下逻辑展开：\ref{sec:branch-weight} 节定义拓扑分支与多分支权重；\ref{sec:genus-interval} 节说明亏格不变区间；\ref{sec:geo-repr} 节给出两种几何差异度量；\ref{sec:greedy} 节统一为贪心简化算法。
+本节给出基于几何过滤的增广轮廓树节点简化方法。输入为规则网格 $\Omega$ 上的标量场 $f:\Omega\rightarrow\mathbb{R}$ 及其增广轮廓树 $T=(V,E,f)$，输出为几何过滤增广轮廓树 $T'$——在严格保留连通性与亏格变化临界点的前提下，沿拓扑分支筛选出几何上有代表性的普通节点后重建而得的简化树。图~\ref{fig:pipeline} 给出方法的整体流程；图~\ref{fig:framework} 给出核心概念的直观示意——增广轮廓树的临界点将标量轴划分为若干亏格不变区间，每条拓扑分支对应一个区间，分支内部等值面拓扑不变、仅有几何演化。全文按以下逻辑展开：\ref{sec:branch-weight} 节定义多分支权重；\ref{sec:genus-interval} 节说明亏格不变区间；\ref{sec:geo-repr} 节给出两种几何差异度量；\ref{sec:greedy} 节统一为贪心简化算法。
 
 \begin{figure*}[t]
 \centering
 \includegraphics[height=0.42\textheight]{fig-framework.pdf}
-\caption{增广轮廓树与亏格不变区间。左：增广轮廓树（灰色圆为结构节点，白色圆为普通节点）；右：临界点投影到标量轴后划分出的亏格不变区间 $I_1$--$I_7$（颜色表示连通分量数 $c$，各区间内亏格 $g$ 保持不变）。}
+\caption{增广轮廓树到临界值分区映射。左：轮廓树（灰色圆为结构节点即临界点，白色圆为普通节点）；中：临界点沿等高度投影到标量轴 $f$，将其划分为若干区间 $I_1$--$I_7$；右：在鞍点处提取的真实网格等值面，展示分量合并瞬间。图中颜色按连通分量数 $c$ 区分（蓝色 $c{=}1$，绿色 $c{=}2$，橙色 $c{=}3$）；临界点类型以边框颜色标记（蓝=极小值/分量出生，绿=鞍点/合并或分裂，红=极大值/分量消亡）。各区间内亏格 $g$ 保持不变：设 $I_1$ 亏格为 $g_1$，则 $g = g_1 + (c-1)$；$\chi$ 为边/区间等值面的 Euler 示性数。}
 \label{fig:framework}
 \end{figure*}
 
 % ========================================
-% 3.1 拓扑分支分解与多分支权重
+% 3.1 多分支权重
 % ========================================
-\subsection{拓扑分支分解与多分支权重}
+\subsection{多分支权重}
 \label{sec:branch-weight}
 
-增广轮廓树的节点按拓扑角色分为两类：结构节点集合 $V_s$（根、叶/极值点和分支节点/鞍点）记录连通性与亏格的变化；普通节点集合 $V_o=V\setminus V_s$（度数为~$2$ 的增广节点）记录中间等值面状态。从每个结构节点出发，沿度数为~$2$ 的普通节点连续游走到下一个结构节点，即得一条\textbf{拓扑分支}（topological branch）$b_\ell=(v_0,v_1,\ldots,v_k)$，其中 $v_0,v_k\in V_s$ 为必须保留的端点，中间节点按标量值定向排列，全为候选普通节点。整棵增广轮廓树被这些分支无重叠地分解。
+增广轮廓树的节点按拓扑角色分为\textbf{结构节点}与\textbf{普通节点}两类（如图~\ref{fig:framework} 左部所示）。结构节点集合 $V_s$ 包含根、叶（极值点）和分支节点（鞍点），记录连通性与亏格的跳变；普通节点集合 $V_o = V \setminus V_s$ 为度数等于~$2$ 的增广节点，记录中间等值面状态。相邻结构节点之间由普通节点串连而成的路径称为一条\textbf{拓扑分支}（topological branch）$b_\ell = (v_0, v_1, \ldots, v_k)$，其中端点 $v_0, v_k \in V_s$，中间节点按标量值排列。每条分支的\textbf{标量跨度}（scalar span）定义为
+\[
+\pi_\ell = f_{\max}(b_\ell) - f_{\min}(b_\ell),
+\]
+它刻画该分支承载的标量演化范围，在拓扑数据分析中对应\textbf{持久性}（persistence）在分支层面的近似——持久性衡量一个拓扑特征在过滤中的存活时间，$\pi_\ell$ 越大表示分支承载的演化区间越长，在简化中应越被优先保护。
 
-每条分支 $b_\ell$ 的标量跨度 $\pi_\ell = f_{\max}(b_\ell)-f_{\min}(b_\ell)$ 刻画其承载的标量演化范围，可视为持久性在分支层面的近似。在轮廓树中，同一标量层级 $t_i=f(v_i)$ 可能穿过多条分支，记活跃分支集合为
+在轮廓树中，同一标量层级 $t_i = f(v_i)$ 可能同时穿过多条拓扑分支。记活跃分支集合为
 \begin{equation}
-\mathcal{B}(t_i)=\{\,b_\ell\mid f_{\min}(b_\ell)\leq t_i\leq f_{\max}(b_\ell)\,\}.
+\mathcal{B}(t_i) = \{\,b_\ell \mid f_{\min}(b_\ell) \leq t_i \leq f_{\max}(b_\ell)\,\}.
 \label{eq:active-branch}
 \end{equation}
-节点筛选应同时考虑所有活跃分支的变化。为此，对每条活跃分支 $b_\ell$ 定义两类权重：拓扑权重 $w^{\mathrm{topo}}_\ell$ 按标量跨度归一化，几何规模权重 $w^{\mathrm{geo}}_\ell$ 按该分支在当前层级的活性边数 $s_\ell$（见 \ref{sec:geo-repr} 节）归一化：
+节点筛选需同时考虑所有活跃分支的变化，为此对每条活跃分支 $b_\ell$ 定义两类权重。\textbf{拓扑权重} $w^{\mathrm{topo}}_\ell$ 按标量跨度归一化，使跨度越大的分支获得更高权重；\textbf{几何规模权重} $w^{\mathrm{geo}}_\ell$ 按该分支在当前层级的活性边数 $s_\ell$（即等值面截穿的网格边数，定义见 \ref{sec:geo-repr} 节）归一化，使几何规模越大的分支获得更高权重：
 \begin{equation}
-w^{\mathrm{topo}}_\ell=\frac{\pi_\ell}{\sum_{k:\,b_k\in\mathcal{B}(t_i)}\pi_k},\qquad
-w^{\mathrm{geo}}_\ell=\frac{s_\ell}{\sum_{k:\,b_k\in\mathcal{B}(t_i)} s_k}.
+w^{\mathrm{topo}}_\ell = \frac{\pi_\ell}{\sum_{k:\,b_k \in \mathcal{B}(t_i)} \pi_k},\qquad
+w^{\mathrm{geo}}_\ell = \frac{s_\ell}{\sum_{k:\,b_k \in \mathcal{B}(t_i)} s_k}.
 \label{eq:weights}
 \end{equation}
-二者通过混合系数 $\alpha\in[0,1]$ 线性组合为最终权重
+二者通过混合系数 $\alpha \in [0,1]$ 线性组合为最终权重
 \begin{equation}
-w_\ell=\frac{\alpha\,w^{\mathrm{topo}}_\ell+(1-\alpha)\,w^{\mathrm{geo}}_\ell}
-{\sum_{k}\bigl[\alpha\,w^{\mathrm{topo}}_k+(1-\alpha)\,w^{\mathrm{geo}}_k\bigr]}.
+w_\ell = \frac{\alpha\,w^{\mathrm{topo}}_\ell + (1-\alpha)\,w^{\mathrm{geo}}_\ell}
+{\sum_{k}\bigl[\alpha\,w^{\mathrm{topo}}_k + (1-\alpha)\,w^{\mathrm{geo}}_k\bigr]}.
 \label{eq:wmix}
 \end{equation}
-$\alpha=1$ 退化为纯拓扑权重，倾向保护标量跨度大的主分支但可能低估正经历显著截交变化的旁支；$\alpha=0$ 退化为纯几何规模权重，响应局部结构规模但可能稀释拓扑上重要的小分支。各活跃分支的局部差异 $d_\ell$（定义见 \ref{sec:geo-repr} 节）经权重汇总为整体差异
+$\alpha = 1$ 退化为纯拓扑权重，倾向保护持久性高（标量跨度大）的主分支，但可能低估正经历显著截交变化的旁支；$\alpha = 0$ 退化为纯几何规模权重，响应局部结构规模但可能稀释拓扑上重要的小分支。各活跃分支的局部差异 $d_\ell$（定义见 \ref{sec:geo-repr} 节）经权重汇总为整体差异
 \begin{equation}
-D(v_r,v_i)=\sum_{\ell:\,b_\ell\in\mathcal{B}(t_i)} w_\ell\, d_\ell(v_r,v_i),\qquad \sum_\ell w_\ell=1,
+D(v_r, v_i) = \sum_{\ell:\,b_\ell \in \mathcal{B}(t_i)} w_\ell\, d_\ell(v_r, v_i),\qquad \sum_\ell w_\ell = 1,
 \label{eq:aggregate}
 \end{equation}
-其中 $v_r$ 为最近一次保留的参考节点。$D$ 是贪心简化（\ref{sec:greedy} 节）的核心判据。
+其中 $v_r$ 为当前分支链上最近一次保留的参考节点，$v_i$ 为待判定的候选节点，$d_\ell(v_r, v_i)$ 为分支 $b_\ell$ 上从 $v_r$ 到 $v_i$ 的几何差异。$D$ 是贪心简化（\ref{sec:greedy} 节）中决定是否保留 $v_i$ 的核心判据：当 $D$ 超过阈值时保留 $v_i$，否则跳过。
 
 % ========================================
 % 3.2 亏格不变区间与分支映射
@@ -202,9 +202,9 @@ D(v_r,v_i)=\sum_{\ell:\,b_\ell\in\mathcal{B}(t_i)} w_\ell\, d_\ell(v_r,v_i),\qqu
 \subsection{亏格不变区间与分支映射}
 \label{sec:genus-interval}
 
-Morse 理论保证：只有当阈值穿过轮廓树的临界点（结构节点）时等值面的拓扑才发生跳变，每个临界点对欧拉示性数的贡献为 $\Delta\chi=(-1)^i$（$i$ 为 Morse 指数）。因此，在两个相邻结构节点之间的标量区间内，等值面的连通分量数和亏格均保持不变。对拓扑分支 $b_\ell=(v_0,\ldots,v_k)$，其端点 $v_0,v_k\in V_s$ 之间的开区间 $(f(v_0),f(v_k))$ 不含其他临界点，即为一个\textbf{亏格不变区间}（genus-invariant interval）。在此区间内，等值面的拓扑类型不随阈值变化，只有几何形状可能演化——这正是在分支内部做纯几何筛选的理论基础。
+Morse 理论保证：只有当阈值穿过轮廓树的临界点（结构节点）时等值面的拓扑才发生跳变，每个临界点对欧拉示性数的贡献为 $\Delta\chi=(-1)^i$（$i$ 为 Morse 指数）。因此，在两个相邻结构节点之间的标量区间内，等值面的连通分量数和亏格均保持不变。如图~\ref{fig:framework} 中部所示，临界点沿等高度投影到标量轴后将其划分为若干区间 $I_1$--$I_7$，每个区间对应一条拓扑分支 $b_\ell=(v_0,\ldots,v_k)$，其端点 $v_0,v_k\in V_s$ 之间的开区间 $(f(v_0),f(v_k))$ 不含其他临界点，即为一个\textbf{亏格不变区间}（genus-invariant interval）。在此区间内，等值面的拓扑类型不随阈值变化，只有几何形状可能演化——这正是在分支内部做纯几何筛选的理论基础。
 
-这一映射具有三方面关键保证：（1）分支内部拓扑不变——任意两个普通节点的等值面具有相同的连通分量数和亏格，二者差异纯粹是几何差异；（2）亏格变化仅发生在端点——一阶鞍点使亏格增加、二阶鞍点使其减少，本文通过保留所有结构节点来保证亏格变化点不被删除；（3）分支间互不干涉——同一层级穿过的多条分支各自对应独立的亏格不变区间，几何比较被严格限制在各分支内部（\ref{sec:geo-repr} 节）。
+这一映射具有三方面关键保证：（1）分支内部拓扑不变——任意两个普通节点的等值面具有相同的连通分量数和亏格，二者差异纯粹是几何差异；（2）亏格变化仅发生在端点——如图~\ref{fig:framework} 右部所示，鞍点处等值面发生分量合并或分裂，一阶鞍点使亏格增加、二阶鞍点使其减少，本文通过保留所有结构节点来保证亏格变化点不被删除；（3）分支间互不干涉——同一层级穿过的多条分支各自对应独立的亏格不变区间，几何比较被严格限制在各分支内部（\ref{sec:geo-repr} 节）。
 
 综合以上，结构节点全部保留确保不丢失任何亏格变化事件；分支内部仅做几何筛选，不会引入或遗漏拓扑事件；多分支加权保持各分支的独立性，不跨越亏格不变区间混合比较。
 
