@@ -48,7 +48,21 @@
 
 \maketitle
 
-\setcounter{section}{1}
+\begin{abstract}
+增广轮廓树通过在临界节点之间插入大量普通节点来记录等值面的连续演化，但相邻普通节点对应的等值面往往高度相似，造成冗余。现有方法要么依赖手工设计的拓扑权重做简化而忽略分支内部的几何演化，要么度量几何相似性却脱离轮廓树分支结构。本文提出一种拓扑保持的几何过滤增广轮廓树节点简化框架：在严格保留所有连通性与亏格变化临界点的前提下，以"活性子图"——等值面在底层网格上的离散截交结构——作为统一的几何描述子，给出 Jaccard 边集距离与基于 SAT+GPS 图 Transformer 编码的向量化距离两种可替换度量，并通过多分支加权贪心算法沿拓扑分支筛选几何上有代表性的节点。在 20 个合成标量场数据集上的实验表明，SAT+GPS 增强度量在对称 Chamfer 距离、Hausdorff 距离和面积属性误差等中立指标上分别改善纯 Jaccard 基线 4.84\%、4.28\% 和 4.19\%，且在未参与训练的测试子集上改善幅度更大。
+\end{abstract}
+
+\section{引言}
+
+科学计算、医学影像和流体模拟产生的三维标量场中，等值面是刻画场结构的基本工具。\cite{lorensen_cline_1987} 选择有代表性的等值面——覆盖不同的空间区域、拓扑事件与几何形态——对于数据分析与可视化至关重要。轮廓树（contour tree）\cite{van_kreveld_1997,carr_contour_2003} 通过记录等值面连通分量随阈值变化的出生、合并、分裂与消亡过程，为等值面的全局层次结构提供了紧凑的拓扑描述。增广轮廓树\cite{gueunet_act_2019} 进一步在临界节点之间插入大量普通节点以记录中间等值面状态，但这也带来了显著的冗余：相邻普通节点对应的等值面往往在几何上高度相似。
+
+如何在保留关键拓扑信息的前提下去除这种冗余，是一个尚未被充分解决的问题。拓扑方法（如基于持久性的分支剪枝\cite{edelsbrunner_persistence_2002,carr_geometric_2004}）能保住连通性与亏格变化的临界点，却难以刻画同一拓扑分支内部等值面几何形状的演化；几何方法（如等值面相似性图 ISM\cite{bruckner_ism_2010}）能度量形状差异，却脱离轮廓树的分支结构，将多个连通分支的变化混合到同一描述符中。两类方法尚未在同一框架内统一。
+
+本文提出一种基于几何过滤的增广轮廓树节点简化框架，在三个层面同时保障等值面序列的代表性：（1）\textbf{拓扑保持}：所有结构节点（极值点、鞍点、分支节点）无条件保留，Morse 理论保证的亏格不变区间约束使分支内部仅做纯几何筛选；（2）\textbf{几何感知}：以"活性子图"——等值面在底层网格上的离散截交结构——作为统一描述子，给出 Jaccard 边集差异与基于图 Transformer 编码的向量化差异两种可替换度量；（3）\textbf{多分支感知}：同一标量层级穿过的多条分支按拓扑显著性与几何规模加权聚合。其中图 Transformer 编码器采用 GraphGPS\cite{rampasek_gps_2022} 框架为骨架，引入 SAT\cite{chen_sat_2022} 风格的结构感知注意力（query 与 key 取自局部消息传递输出而非原始节点特征），并以活性边上的等值面插值参数作为连续边特征，使编码器能够捕捉 Jaccard 二值边集所不具备的几何信息。
+
+值得强调的是，本框架中学习组件被严格限制在几何通道内：拓扑保持（结构节点保留、亏格区间划分）和最终的贪心判定均为确定性算法，不经过神经网络；编码器仅在"分支内部拓扑已保证不变"的前提下度量几何差异。因此，无论编码器的训练效果如何，拓扑正确性均不受影响。
+
+在 20 个规则网格合成标量场数据集上的实验表明：（1）结构节点保留率恒为 100\%，简化强度可由单一参数 $\varepsilon$ 连续控制；（2）SAT+GPS 增强度量在对称 Chamfer 距离、Hausdorff 距离等中立几何指标上分别改善纯 Jaccard 基线 4.84\% 和 4.28\%，且在未参与编码器训练的测试子集上改善幅度更大（Chamfer $-10.2\%$，Hausdorff $-7.6\%$）；（3）多分支加权在分支重叠度适中的数据上提升最小分支保留率，改善覆盖均匀性。
 
 \section{相关研究与研究动机}
 
@@ -147,7 +161,7 @@ Van Kreveld 等最早将轮廓树引入等值面遍历，以其变体构造可�
 
 Bajaj 等提出等值面谱（contour spectrum），将等值面面积、体积、梯度积分等属性表达为等值的分段 B 样条函数，首次将几何量化方法引入等值面阈值选择。\cite{bajaj_spectrum_1997} Chiang 与 Lu 提出保持所有可能等值面拓扑的渐进四面体网格简化算法，是拓扑感知网格简化的关键先驱。\cite{chiang_lu_2003} Bruckner 与 Möller 提出等值面相似性图（ISM），以归一化互信息比较不同阈值下的距离场结构，从相似度矩阵中选出代表性等值面，是等值面几何相似性度量的里程碑；\cite{bruckner_ism_2010} 但 ISM 将多个连通分支的变化混合到同一距离场描述符中，难以区分分支级别的几何差异。Wang 提出基于区间体与等值面面积的 VOA 度量以及基于点距的分割度量，用于自动检测代表性等值与语义化等值面分割。\cite{wang_isomeasure_2020} 在此基础上，Li 等将 ISM 扩展到多视图场景，通过跨视图一致的相似性聚类同时驱动传递函数设计与代表性等值面选择；\cite{li_multiview_ism_2025} Zhou 等面向气象集合数据，以 contour probability similarity 做非均匀下采样得到 key-isovalue，并结合信息损失曲线自动决定采样密度。\cite{zhou_keyisovalue_2025} 深度表征方面，Dai 等提出 IsoExplorer，用 Octree 卷积变分自编码器学习每张连通等值面的潜表示，把等值面相似性从"距离场互信息"迁移到"神经嵌入距离"；\cite{dai_isoexplorer_2021} He 等则提出 ScalarGCN，把标量值作为图节点用 GCN 学习关联表征，是把 GCN 系统性引入体数据分析的先驱之一。\cite{he_scalargcn_2021} Li 与 Shen 借助不确定度传播，把隐式神经表示上的等值面提取显著加速，代表神经场表征下的等值面几何提取方向。\cite{li_shen_inr_2024} 上述工作展示了 ISM 家族从"手工描述子"迈向"多视图/集合/神经表征"的演化，但共同短板是脱离轮廓树的分支结构，几何差异被混合在多分支之间。
 
-Kipf 与 Welling 提出图卷积网络（GCN），通过对称归一化的一阶邻域聚合实现高效的半监督节点分类，是图神经网络最具影响力的基石模型。\cite{kipf_gcn_2017} Hamilton 等提出 GraphSAGE，以邻域采样与可学习聚合器实现大规模图上的归纳式表示学习，可为新节点生成 embedding。\cite{hamilton_graphsage_2017} Gilmer 等提出消息传递神经网络（MPNN）通用框架，将多种 GNN 变体统一到消息、更新与读出三阶段范式下。\cite{gilmer_mpnn_2017} Xu 等从理论上刻画消息传递 GNN 的判别能力上界，提出可达 Weisfeiler-Leman 测试上界的图同构网络（GIN）。\cite{xu_gin_2019} 在此基础上，Rampasek 等提出 GraphGPS 通用框架，把 GT 拆解为位置/结构编码、局部消息传递与全局注意力三部分，实现线性复杂度的图 Transformer；\cite{rampasek_gps_2022} Bar-Shalom 等提出 Subgraphormer，通过图积视角把子图 GNN 与 Graph Transformer 统一，为"选取子图 + GNN 编码"这一范式提供理论表达力支撑。\cite{barshalom_subgraphormer_2024} 面向网格与曲面，Hanocka 等提出 MeshCNN，在三角网格的边上定义卷积与池化操作，以任务驱动的边折叠在保持拓扑的同时实现网格分辨率降低；\cite{hanocka_meshcnn_2019} Sharp 等提出 DiffusionNet，以基于 Laplace-Beltrami 算子的学习扩散层实现对分辨率与采样变化自动鲁棒的表面学习。\cite{sharp_diffusionnet_2022} 面向物理仿真，Pfaff 等提出 MeshGraphNet，以编码-处理-解码架构在非结构化网格上直接学习模拟；\cite{pfaff_meshgraphnet_2021} Nabian 等进一步在图分区与多尺度图上扩展该框架，实现工业级几何上的可扩展学习。\cite{nabian_xmesh_2024} 在图度量学习方向，Jain 等提出 GRAPHEDX，用神经集散度学习通用代价下的图编辑距离，代表当前"用神经网络学习图相似度"的最新水平。\cite{jain_graphedx_2024} 与本文最直接同构的工作是 Qin 等提出的合并树神经网络（MTNN），首次系统地用 GNN 学习整棵合并树的相似度嵌入，将拓扑比较速度提升两个数量级。\cite{qin_mtnn_2024} 但 MTNN 学习的是"整棵合并树"的相似度嵌入用于比较任务，而本文用图 Transformer 学习"分支级活性子图"的向量化用于增广轮廓树的几何过滤，输入图结构、监督信号与下游任务均不同，两者是"图表示学习 + 拓扑抽象"方向的两个互补切面。
+消息传递图神经网络（MPNN）通过邻域聚合迭代更新节点表示，\cite{gilmer_mpnn_2017} 以 GCN\cite{kipf_gcn_2017} 和 GIN\cite{xu_gin_2019} 为代表，为图表示学习奠定了基础；但其感受野受限于层数，理论判别能力不超过 Weisfeiler-Leman 测试。\cite{xu_gin_2019} 为突破消息传递的局限，图 Transformer（GT）引入全局注意力以直接建模任意节点对的交互。Ying 等提出 Graphormer，以中心度、空间距离与边属性作为注意力偏置，在分子性质预测基准上取得了突破性成绩，是将 Transformer 成功引入图学习的标志性工作。\cite{ying_graphormer_2021} Kreuzer 等提出 SAN（Spectral Attention Network），通过专用的可学习位置编码模块处理 Laplacian 全谱信息，并在注意力中显式区分真实边与虚拟边。\cite{kreuzer_san_2021} Dwivedi 等提出 LSPE，将结构与位置编码解耦为两路并在消息传递中联合更新，而非仅作为固定的输入拼接。\cite{dwivedi_rwse_2022} Lim 等提出 SignNet/BasisNet，构建对 Laplacian 特征向量符号翻转和高维基旋转具有严格不变性的网络，使谱位置编码在理论上良定义。\cite{lim_signnet_2023} 在架构层面，Chen 等提出结构感知 Transformer（SAT），将注意力核从比较节点特征改为比较以节点为中心提取的子图表示，使注意力本身具备结构感知能力，并给出可控性与判别力两条理论保证。\cite{chen_sat_2022} Rampasek 等提出 GraphGPS 通用框架，将 GT 系统拆解为位置/结构编码、局部消息传递与全局注意力三个可替换模块；\cite{rampasek_gps_2022} Kim 等提出 TokenGT，将节点与边均视为独立 token 送入标准 Transformer，证明其表达力不低于 2 阶不变图网络。\cite{kim_tokengt_2022} 面向可扩展性，Shirzad 等提出 Exphormer，结合扩展图与虚拟节点构建稀疏注意力，在线性复杂度下保持谱近似与通用性保证。\cite{shirzad_exphormer_2023} Bar-Shalom 等提出 Subgraphormer，通过图积视角把子图 GNN 与图 Transformer 统一，为"子图提取 + Transformer 编码"范式提供理论表达力支撑。\cite{barshalom_subgraphormer_2024} 面向网格与物理仿真，MeshCNN\cite{hanocka_meshcnn_2019} 和 DiffusionNet\cite{sharp_diffusionnet_2022} 分别在三角网格的边和 Laplace-Beltrami 算子上定义学习操作；Wu 等提出 Transolver，以物理感知的 token 切片替代逐顶点 token，实现面向一般几何的线性复杂度 PDE 求解。\cite{wu_transolver_2024} 在图度量学习方向，Jain 等提出 GRAPHEDX，用神经集散度学习通用代价下的图编辑距离。\cite{jain_graphedx_2024} 与本文最直接相关的工作是 Qin 等提出的合并树神经网络（MTNN），首次系统地用 GNN 学习整棵合并树的相似度嵌入，将拓扑比较速度提升两个数量级；\cite{qin_mtnn_2024} 但 MTNN 学习的是"整棵合并树"的相似度嵌入用于比较任务，而本文用图 Transformer 学习"分支级活性子图"的向量化用于增广轮廓树的几何过滤，输入图结构、监督信号与下游任务均不同，两者是"图表示学习 + 拓扑抽象"方向的两个互补切面。
 
 综上，拓扑方法能保住连通性与亏格变化点却难以刻画分支内几何演化，几何方法能度量形状差异却脱离轮廓树分支结构，图表示学习提供了局部结构编码的工具但尚未应用于等值面代表性筛选。三者尚未在同一框架内统一，这一空缺正是本文工作的出发点。
 \section{方法}
@@ -207,7 +221,7 @@ Morse 理论保证：只有当阈值穿过轮廓树的临界点（结构节点�
 
 这一映射具有三方面关键保证：（1）分支内部拓扑不变——任意两个普通节点的等值面具有相同的连通分量数和亏格，二者差异纯粹是几何差异；（2）亏格变化仅发生在端点——如图~\ref{fig:framework} 右部所示，鞍点处等值面发生分量合并或分裂，一阶鞍点使亏格增加、二阶鞍点使其减少，本文通过保留所有结构节点来保证亏格变化点不被删除；（3）分支间互不干涉——同一层级穿过的多条分支各自对应独立的亏格不变区间，几何比较被严格限制在各分支内部（\ref{sec:geo-repr} 节）。
 
-综合以上，结构节点全部保留确保不丢失任何亏格变化事件；分支内部仅做几何筛选，不会引入或遗漏拓扑事件；多分支加权保持各分支的独立性，不跨越亏格不变区间混合比较。
+综合以上，结构节点全部保留确保不丢失任何亏格变化事件；分支内部仅做几何筛选，不会引入或遗漏拓扑事件；多分支加权保持各分支的独立性，不跨越亏格不变区间混合比较。这一设计使学习组件被严格限制在几何通道内——编码器仅在"拓扑已保证不变"的分支内部度量几何差异，不参与拓扑判定；因此，无论编码器的训练效果如何，拓扑正确性均不受影响。
 
 % ========================================
 % 3.3 分支上的几何表示学习
@@ -245,8 +259,8 @@ Jaccard 逐边比较对网格离散化敏感、缺乏结构感知：等值面平
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.9\linewidth]{GNN.jpg}
-\caption{基于 SAT+GPS 的活性子图结构编码流程。左：从标量场网格中提取活性子图作为输入图；中：节点与边特征构造、SAT+GPS 编码；右：读出定长向量并计算差异。}
+\includegraphics[width=0.9\linewidth]{GNN.jpeg}
+\caption{基于 SAT+GPS 的活性子图结构编码器架构。左：从三维网格提取活性子图并构造节点/边特征；中：3 层 SAT+GPS Block（局部 Edge-GINE 与 SAT 风格全局注意力，Q/K 取自局部输出 $h_{\mathrm{local}}$）；右：双池化读出与余弦距离计算。}
 \label{fig:gnn-pipeline}
 \end{figure}
 
@@ -740,11 +754,6 @@ T. N. Kipf and M. Welling.
 Semi-supervised classification with graph convolutional networks.
 \textit{International Conference on Learning Representations}, 2017.
 
-\bibitem{hamilton_graphsage_2017}
-W. L. Hamilton, R. Ying, and J. Leskovec.
-Inductive representation learning on large graphs.
-\textit{Advances in Neural Information Processing Systems}, 30, 2017.
-
 \bibitem{gilmer_mpnn_2017}
 J. Gilmer, S. S. Schoenholz, P. F. Riley, O. Vinyals, and G. E. Dahl.
 Neural message passing for quantum chemistry.
@@ -775,16 +784,6 @@ N. Sharp, S. Attaiki, K. Crane, and M. Ovsjanikov.
 DiffusionNet: Discretization agnostic learning on surfaces.
 \textit{ACM Transactions on Graphics}, 41(3):27:1--27:16, 2022.
 
-\bibitem{pfaff_meshgraphnet_2021}
-T. Pfaff, M. Fortunato, A. Sanchez-Gonzalez, and P. W. Battaglia.
-Learning mesh-based simulation with graph networks.
-\textit{International Conference on Learning Representations}, 2021.
-
-\bibitem{nabian_xmesh_2024}
-M. A. Nabian, C. Liu, R. Ranade, and S. Choudhry.
-X-MeshGraphNet: Scalable multi-scale graph neural networks for physics simulation.
-\textit{arXiv preprint arXiv:2411.17164}, 2024.
-
 \bibitem{jain_graphedx_2024}
 E. Jain, I. Roy, S. Meher, S. Chakrabarti, and A. De.
 Graph edit distance with general costs using neural set divergence.
@@ -796,6 +795,36 @@ Rapid and precise topological comparison with merge tree neural networks.
 \textit{IEEE Transactions on Visualization and Computer Graphics}, 2024.
 
 % === 本文新增引用 ===
+
+\bibitem{ying_graphormer_2021}
+C. Ying, T. Cai, S. Luo, S. Zheng, G. Ke, D. He, Y. Shen, and T.-Y. Liu.
+Do transformers really perform bad for graph representation?
+\textit{Advances in Neural Information Processing Systems}, 34, 2021.
+
+\bibitem{kreuzer_san_2021}
+D. Kreuzer, D. Beaini, W. L. Hamilton, V. L\'etourneau, and P. Tossou.
+Rethinking graph transformers with spectral attention.
+\textit{Advances in Neural Information Processing Systems}, 34, 2021.
+
+\bibitem{lim_signnet_2023}
+D. Lim, J. Robinson, L. Zhao, T. Smidt, S. Sra, H. Maron, and S. Jegelka.
+Sign and basis invariant networks for spectral graph representation learning.
+\textit{International Conference on Learning Representations}, 2023.
+
+\bibitem{kim_tokengt_2022}
+J. Kim, D. T. Nguyen, S. Min, S. Cho, M. Lee, H. Lee, and S. Hong.
+Pure transformers are powerful graph learners.
+\textit{Advances in Neural Information Processing Systems}, 35, 2022.
+
+\bibitem{shirzad_exphormer_2023}
+H. Shirzad, A. Velingker, B. Venkatachalam, D. J. Sutherland, and A. K. Sinop.
+Exphormer: Sparse transformers for graphs.
+\textit{International Conference on Machine Learning}, pages 31613--31632, 2023.
+
+\bibitem{wu_transolver_2024}
+H. Wu, H. Luo, H. Wang, J. Wang, and M. Long.
+Transolver: A fast transformer solver for PDEs on general geometries.
+\textit{International Conference on Machine Learning}, pages 53681--53705, 2024.
 
 \bibitem{chen_sat_2022}
 D. Chen, L. O'Bray, and K. Borgwardt.
